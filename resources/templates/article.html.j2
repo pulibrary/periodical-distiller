@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>{{ item.headline }}</title>
+    {% if stylesheet_path %}
+    <link rel="stylesheet" href="{{ stylesheet_path }}">
+    {% else %}
+    <style>
+        body {
+            font-family: Georgia, 'Times New Roman', serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 2cm auto;
+            padding: 0 1cm;
+        }
+        header {
+            border-bottom: 2px solid #000;
+            padding-bottom: 1cm;
+            margin-bottom: 1cm;
+        }
+        h1 {
+            font-size: 24pt;
+            margin: 0 0 0.5cm 0;
+        }
+        .subhead {
+            font-size: 14pt;
+            font-style: italic;
+            color: #444;
+            margin: 0.3cm 0;
+        }
+        .meta {
+            font-size: 9pt;
+            color: #666;
+            margin-top: 0.5cm;
+        }
+        .meta-item {
+            margin-right: 1cm;
+        }
+        .abstract {
+            font-style: italic;
+            color: #555;
+            margin: 1cm 0;
+            padding: 0.5cm;
+            background: #f5f5f5;
+            border-left: 3px solid #ccc;
+        }
+        .content {
+            text-align: justify;
+        }
+        .content p {
+            margin: 0.5cm 0;
+        }
+        .content a {
+            color: #0066cc;
+        }
+        .chart-image {
+            text-align: center;
+            margin: 1cm 0;
+        }
+        .chart-image img {
+            max-width: 85%;
+            height: auto;
+        }
+        .tags {
+            margin-top: 1cm;
+            padding-top: 0.5cm;
+            border-top: 1px solid #ddd;
+            font-size: 9pt;
+            color: #666;
+        }
+        .tag {
+            display: inline-block;
+            background: #f0f0f0;
+            padding: 0.1cm 0.3cm;
+            margin-right: 0.2cm;
+            border-radius: 3px;
+        }
+    </style>
+    {% endif %}
+</head>
+<body>
+    <article>
+        <header>
+            <h1>{{ item.headline }}</h1>
+            {% if item.subhead %}
+            <div class="subhead">{{ item.subhead }}</div>
+            {% endif %}
+            <div class="meta">
+                <span class="meta-item">
+                    <strong>Published:</strong>
+                    {{ item.published_at | format_date }}
+                </span>
+                {% if item.authors %}
+                <span class="meta-item">
+                    <strong>By:</strong>
+                    {{ item.authors | format_authors }}
+                </span>
+                {% endif %}
+            </div>
+        </header>
+
+        {% if item.abstract %}
+        <div class="abstract">
+            {{ item.abstract | clean_content | safe }}
+        </div>
+        {% endif %}
+
+        <div class="content">
+            {{ item.content | clean_content | safe }}
+        </div>
+
+        {% if item.tags %}
+        <div class="tags">
+            <strong>Tags:</strong>
+            {% for tag in item.tags | parse_tags %}
+            <span class="tag">{{ tag }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </article>
+</body>
+</html>

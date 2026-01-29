@@ -1,0 +1,425 @@
+#+title: Periodical Distiller Design Document
+#+date: <2026-01-28 Wed>
+#+author: Cliff Wulfman
+#+email: cwulfman@princeton.edu
+#+language: en
+
+* Overview
+Periodical Distiller is a system for creating METS/ALTO packages
+(MAPs) that can be ingested into the Veridian Presentation Software
+system (Veridian).
+
+- METS/ALTO Package (MAP) :: a collection of data that conforms with
+  the [[https://www.loc.gov/standards/mets/][Metadata Encoding & Transmission Standard]] and
+  [[https://www.loc.gov/standards/alto/][Analyzed Layout and Text Object]] schemas.
+
+- Veridian :: A [[https://veridiansoftware.com/services/presentation-software][software system]] developed by [[https://veridiansoftware.com/][VeridianSoftware]] to
+  support discovery of and access to collections of digitized
+  newspapers and magazines.
+  
+** Stakeholders
+- Princeton University Library
+  - Princeton University Archives
+  - Library IT
+- The Daily Princetonian (for the Daily Princetonian Phase)
+  - Board of directors
+  - Current editorial staff
+
+
+** Motivations
+*** Augmenting the Daily Princetonian Archive with Born-Digital Content
+[[https://en.wikipedia.org/wiki/The_Daily_Princetonian][The Daily Princetonian]] is a student-run publication at Princeton
+University. It was published as a daily newspaper from 1876 through
+2024, and the [[https://papersofprinceton.princeton.edu/][Papers of Princeton]], a Veridian-based web site
+maintained by the [[https://library.princeton.edu/services/special-collections/university-archives][Princeton University Archives]], contains a [[https://papersofprinceton.princeton.edu/princetonperiodicals/?a=cl&cl=CL1&sp=Princetonian&e=-------en-20--1--txt-txIN-------][digitized
+archive of these printed issues]].
+
+Since 2001, /The Daily Princetonian/ has been [[https://www.dailyprincetonian.com/][published on the
+World-Wide Web]], using [[https://snworks.zendesk.com/hc/en-us/categories/10686316588052-CEO3][CEO3]], a headless CMS developed by [[https://snworks.zendesk.com/hc/en-us][SNWorks]].
+The Prince does not publish daily editions; instead, its web site is
+updated continuously, not periodically.
+
+The Daily Princetonian Board would like to include this born-digital
+content in the Papers of Princeton.
+
+**** Challenges
+- Veridian is designed to handle discrete, periodically printed issues
+  that have been digitized from printed pages and represented in MAPs.
+  The continuously published online Prince must be discretized and
+  captured in form that can be converted to Veridian-compliant MAPs.
+  
+*** Supporting the Aims of Project Strawberry
+Strawberry is a long-term project to support the digitization of
+periodicals at Princeton University Library (PUL).  PUL would like to
+be able to generalize the capacities developed to support the Daily
+Princetonian Archive to other projects in the Library.
+
+
+* Requirements
+- The system should be highly modular, so that it may be adapted to
+  different publications and workflows
+
+** Daily Princetonian Requirements
+
+
+* Architecture
+The system comprises modular components which may be customized.
+
+** Data Modules
+- Information Packages :: Following the OAIS model, an Information
+  Package is a logical grouping of content and metadata about it.  In
+  this system there are two:
+
+  - Primary Information Packages (PIPs) :: Contain the source data to be
+    distilled, or actionable pointers to it, as well as schemas,
+    access points, etc.
+  - Submission Information Packages (SIPs) :: Like the OAIS SIPS,
+    these packages contain the distillation products that are to be
+    ingested into the repository or content-management system. A SIP
+    for Veridian, for example, would contain a directory of files
+    including a METS file, ALTO files, one or more PDF files, and
+    Image files.
+    
+** Functional Modules
+- Aggregators :: modules that gather resources to be processed by the
+  system.  These might include network clients that retrieve records
+  from networked data sources.
+- Loaders :: processes that provide asynchronous access to primary
+  data when that data is too large to compile into a PIP.
+- Transformers :: modules that use the data retrieved by aggregators to
+  produce derivatives: PDFs, HTML files, coordinated-text files (ALTO,
+  hOCR), descriptive metadata, or METS.
+- Serializers :: modules that transform derivatives into formats that
+  can be stored on disk.
+- SIP Compilers :: Tools that generate SIPs. SIP compilers are loosely
+  coupled with transformers and serializers
+- Validators :: Provide a validation layer
+  - Validate METS/ALTO/MODS output against LOC schemas prior to serialization
+  - Validate PIPs and SIPs against internal schemas
+  - Provide clear error messages identifying which records fail and why
+  - Enable a "validate only" mode for testing without writing files
+
+** Pipeline Orchestrator (Kanban-Style)
+The system adopts a Kanban-style workflow pattern inspired by [[https://github.com/pulibrary/grin-siphon][Grin Siphon]],
+using tokens, buckets, pipes, and filters to manage data flow through
+the processing pipeline.
+
+*** Core Abstractions
+
+| Concept  | Implementation                                        |
+|----------+-------------------------------------------------------|
+| Token    | JSON file with item metadata + processing log         |
+| Bucket   | Directory holding tokens at a pipeline stage          |
+| Pipe     | Moves tokens between buckets with =.bak= locking      |
+| Filter   | Base class for processing stages                      |
+
+*** Separation of Concerns: Filters vs. Transformers
+
+The pipeline maintains a clear separation between infrastructure and
+business logic:
+
+- *Filters* (in =pipeline/filters/=) handle token lifecycle: reading
+  tokens from input buckets, managing =.bak= locking, writing to
+  output buckets or =.err= on failure. Filters are pipeline
+  infrastructure.
+
+- *Transformers* (in =transformers/=) perform the actual work: HTML
+  generation, PDF conversion, ALTO extraction, etc. Transformers are
+  pure business logic with no knowledge of tokens or buckets.
+
+Filters receive Transformers via dependency injection:
+
+#+begin_src python
+class HtmlFilter(Filter):
+    def __init__(self, pipe: Pipe, transformer: HtmlTransformer):
+        super().__init__(pipe)
+        self.transformer = transformer
+
+    def process_token(self, token: Token) -> bool:
+        try:
+            html = self.transformer.transform(token.content["ceo_record"])
+            token.content["html_path"] = self.save_html(html)
+            return True
+        except TransformError as e:
+            token.content["error"] = str(e)
+            return False
+#+end_src
+
+This pattern enables:
+- Independent unit testing of Transformers with plain inputs/outputs
+- Testing Filters with mock Transformers
+- Reusing Transformers outside the pipeline context
+
+*** Two-Tier Pipeline Structure
+
+The pipeline operates at two levels: article-level processing and
+issue-level assembly.
+
+**** Article Pipeline
+Each token represents a single article:
+
+#+begin_example
+ceo_harvest → html_transform → pdf_transform → alto_transform → mods_transform → article_complete
+#+end_example
+
+**** Issue Pipeline
+Each token represents an issue containing multiple articles:
+
+#+begin_example
+issue_staged → issue_collector → mets_compile → sip_validate → sip_package → sip_complete
+#+end_example
+
+*** Key Design Decisions
+
+- *One article = discrete pages*: Articles do not share pages across boundaries
+- *Issue collector uses polling*: Checks =article_complete= bucket for expected articles
+- *Page numbering*: Happens at METS compilation (sequential across articles)
+
+** Domain Objects
+The system uses three primary domain objects to model periodical content.
+
+*** Article
+Represents a single article from the source publication.
+
+#+begin_src python
+class Article:
+    ceo_id: str           # Unique identifier from CEO3
+    issue_id: str         # Parent issue identifier
+    metadata: dict        # Source metadata from CEO3
+    html_path: Path | None
+    pdf_path: Path | None
+    page_count: int
+    alto_paths: list[Path]
+    mods: Element | None  # lxml Element for MODS fragment
+#+end_src
+
+*** Issue
+Represents a periodical issue containing multiple articles.
+
+#+begin_src python
+class Issue:
+    issue_id: str                    # Unique issue identifier
+    date_range: tuple[date, date]    # Publication date range
+    title: str                       # Issue title
+    article_ids: list[str]           # CEOIDs of articles in this issue
+#+end_src
+
+*** Page
+Represents Veridian's view of a page within the assembled issue.
+
+#+begin_src python
+class Page:
+    page_number: int      # Sequential page number within issue
+    article_id: str       # Source article this page belongs to
+    alto_path: Path       # Path to ALTO file for this page
+    image_path: Path      # Path to page image
+#+end_src
+
+** Schema Validation
+Validation occurs as a single stage *before SIP packaging* in the
+issue pipeline.
+
+*** Validation Stage (=sip_validate=)
+
+The validator checks:
+- All ALTO files against LOC ALTO 4.x schema
+- MODS elements against LOC MODS 3.x schema
+- Generated METS against LOC METS 1.x schema
+
+*** Error Handling
+
+On validation failure:
+- Issue token moves to =.err= directory with detailed validation report
+- Individual file failures are logged to the token
+- Failed tokens do not block processing of other issues
+
+*** Implementation
+
+#+begin_src python
+class SIPValidator(Filter):
+    def __init__(self, pipe, alto_schema, mods_schema, mets_schema):
+        super().__init__(pipe)
+        self.alto_schema = etree.XMLSchema(etree.parse(alto_schema))
+        self.mods_schema = etree.XMLSchema(etree.parse(mods_schema))
+        self.mets_schema = etree.XMLSchema(etree.parse(mets_schema))
+
+    def process_token(self, token):
+        errors = []
+        errors.extend(self.validate_alto_files(token))
+        errors.extend(self.validate_mods(token))
+        errors.extend(self.validate_mets(token))
+
+        if errors:
+            token.content["validation_errors"] = errors
+            return False
+        return True
+#+end_src
+
+** Checkpointing and Resumption
+The Kanban pattern provides natural checkpointing and resumption
+capabilities.
+
+| Feature          | How It Works                                               |
+|------------------+------------------------------------------------------------|
+| Checkpointing    | Tokens advance one bucket at a time; each bucket is a checkpoint |
+| Resumption       | Restart filters; they pick up tokens from their input buckets    |
+| Orphan recovery  | Filter base class recovers =.bak= → =.json= on startup           |
+| Error isolation  | Failed tokens go to =.err=; don't block pipeline                 |
+
+*** Issue Collection (Polling)
+
+The issue collector polls for completed articles:
+
+#+begin_src python
+class IssueCollector(Filter):
+    def process_token(self, issue_token):
+        expected = set(issue_token.content["article_ids"])
+        found = self.find_completed_articles(issue_token.content["issue_id"])
+
+        if found == expected:
+            issue_token.content["articles"] = self.gather_articles(expected)
+            return True
+        else:
+            # Not ready — defer
+            self.pipe.put_token_back()
+            return True
+#+end_src
+
+** Specific Packages and Modules for the Daily Princetonian Distiller
+- CEO Client :: a program that accesses the Daily Princetonian's CEO3
+  endpoint and downloads content records.
+- CEO PIP :: an information package that contains the content records
+  downloaded by the CEO Client, plus information about how the records
+  should be ordered or clustered.
+- HTML Transformer :: a module that creates an HTML element from a CEO
+  record using external templates and stylesheets.
+- PDF Transformer :: a module that creates a PDF file from an HTML
+  element or file.
+- ALTO Transformer :: a module that creates an ALTO file for each page
+  in a PDF
+- MODS Transformer :: a module that creates a MODS relatedItem element
+  for each CEO record, or a top-level MODS document for the
+  aggregation, for inclusion in the METS document.
+- METS Compiler :: a module that creates a file system containing
+  derivatives and a METS document.
+
+** Configuration and Support Files
+- Templates :: Jinja2 templates that HTML Transformers can use to
+  generate HTML files or fragments.  There might be a library of these
+  templates to choose from; which specific templates to use can be
+  specified in a configuration file.
+- CSS Stylesheets :: Like the Jinja2 templates, there might be a
+  library of these stylesheets.
+
+** Applications and Scripts
+*** PIP Tools
+- Harvesting Scripts :: Command-line scripts that can be used to
+  download primary data and compile a PIP.
+
+*** Transformer Tools
+Individual command-line scripts that can be used to generate
+derivatives from a PIP.
+
+
+* Implementation Guidelines
+
+** Development
+- The reference implementation shall be written in Python.
+- Prefer the latest stable version of Python unless there are
+  conflicts with dependencies.
+- Use [[https://pdm-project.org/en/latest/][PDM]] to manage dependencies. Configure PDM to use [[https://docs.astral.sh/uv/][uv]].
+- Use the [[https://docs.pytest.org/en/stable/][pytest]] framework for testing.
+
+
+** Programming Paradigms
+- Use Object-Oriented Programming methods and techniques.
+- Use dependency injection to reduce coupling.
+- Follow [[https://en.wikipedia.org/wiki/SOLID][SOLID principles]].
+- Follow [[https://peps.python.org/pep-0008/][PEP 8]].
+
+** Deployment
+- Use GitHub Actions to manage workflows
+
+* Implementation
+
+** Project Layout
+- periodical_distiller
+  - README.md
+  - LICENSE
+  - .env
+    .tool_versions
+    .gitignore
+  - docs
+  - pyproject.toml
+  - resources
+    - schemas                    # LOC XSD schemas for validation
+      - alto-4-4.xsd
+      - mods-3-8.xsd
+      - mets.xsd
+  - src
+    - schemas
+      - __init__.py
+      - ceo_item.py
+      - pip.py
+      - sip.py
+      - article.py               # Article dataclass
+      - issue.py                 # Issue dataclass
+      - page.py                  # Page dataclass (Veridian's view)
+      - tokens
+        - __init__.py
+        - article_token.py       # Article token schema
+        - issue_token.py         # Issue token schema
+    - periodical_distiller
+      - __init__.py
+      - aggregators
+        - __init__.py
+        - ceo_aggregator.py
+      - clients
+        - __init__.py
+        - client.py
+        - ceo_client.py
+      - transformers
+        - __init__.py
+        - transformer.py
+        - html_transformer.py
+        - alto_transformer.py
+        - mods_transformer.py
+        - text_transformer.py
+        - pdf_transformer.py
+      - serializers
+        - __init__.py
+        - serializer.py
+        - html_serializer.py
+        - alto_serializer.py
+        - mods_serializer.py
+        - text_serializer.py
+        - pdf_serializer.py
+      - compilers
+        - __init__.py
+        - compiler.py
+        - mets_compiler.py
+        - veridian_sip_compiler.py
+      - pipeline                  # Kanban-style pipeline orchestration
+        - __init__.py
+        - plumbing.py             # Token, Pipe, Bucket, Filter base class
+        - orchestrator.py         # Coordinates filters via config
+        - filters                 # Pipeline stages (token handling)
+          - __init__.py
+          - harvest_filter.py     # Uses CeoClient
+          - html_filter.py        # Uses HtmlTransformer
+          - pdf_filter.py         # Uses PdfTransformer
+          - alto_filter.py        # Uses AltoTransformer
+          - mods_filter.py        # Uses ModsTransformer
+          - collection_filter.py  # Polls for completed articles
+          - mets_filter.py        # Uses MetsCompiler
+          - validation_filter.py  # Uses LOC schemas
+          - packaging_filter.py   # Assembles final SIP
+      - orchestrators             # (legacy, to be replaced by pipeline)
+        - __init__.py
+      - validators
+        - __init__.py
+      - cli.py
+  - tests
+    - __init__.py
+    - conftest.py
+    - data

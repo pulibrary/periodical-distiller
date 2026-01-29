@@ -28,7 +28,6 @@ wheels/
 .pdm.toml
 .pdm-python
 .pdm-build/
-pdm.lock
 
 # Virtual environments
 .venv/

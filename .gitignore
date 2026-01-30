@@ -62,5 +62,6 @@ Thumbs.db
 # Project specific
 resources/schemas/*.xsd
 output/
+workspace/
 *.bak
 *.err

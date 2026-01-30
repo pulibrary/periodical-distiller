@@ -54,3 +54,30 @@ Aggregators → [PIP] → Transformers → Serializers → SIP Compilers → [SI
 - Object-oriented with dependency injection
 - SOLID principles
 - pytest for testing
+
+## Current Implementation Status
+
+### Completed
+- **CeoClient**: Fetches articles from Daily Princetonian via `/section/news.json` endpoint with client-side date filtering
+- **PIPAggregator**: Assembles fetched articles into PIP directory structure with manifest
+- **CLI**: `harvest-pip` command for creating PIPs from command line
+
+### CLI Usage
+```bash
+# Create PIP for a single date
+pdm run python -m periodical_distiller.cli harvest-pip --date 2026-01-29
+
+# Create PIP for a date range
+pdm run python -m periodical_distiller.cli harvest-pip --start 2026-01-15 --end 2026-01-17
+
+# Specify output directory
+pdm run python -m periodical_distiller.cli harvest-pip --date 2026-01-29 --output ./my-pips
+```
+
+### Next Steps (Pipeline Phases)
+1. **Media Download**: Extend PIPAggregator to download article images/media
+2. **HTML Transformer**: Convert CEO article content to styled HTML
+3. **PDF Transformer**: Generate PDFs from HTML
+4. **ALTO Transformer**: Create ALTO XML from PDF text extraction
+5. **MODS Transformer**: Generate MODS metadata records
+6. **SIP Compiler**: Assemble METS documents and Veridian-compliant packages

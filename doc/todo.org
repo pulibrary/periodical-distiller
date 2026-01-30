@@ -11,9 +11,11 @@
 not known.
 - Suggested Action :: Add type hints for lxml using [[https://github.com/lxml/lxml-stubs/blob/master/lxml-stubs/etree.pyi][lxml-stubs]].
 ** DONE Create Pydantic schema for CEO3 Items
+CLOSED: [2026-01-30]
 :PROPERTIES:
 :ASSIGNEES: Claude
 :CUSTOM_ID: create-pydantic-schema-for-ceoitems
+:COMMIT: 18d986d
 :END:
 
 - Motivation :: The CEOClient needs this schema to validate data it

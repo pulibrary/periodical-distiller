@@ -19,6 +19,8 @@ class IssueTokenContent(BaseModel):
         articles: Completed article data gathered from article pipeline
         mets_path: Path to generated METS file
         validation_errors: List of validation errors if any
+        pip_path: Path to the PIP directory for this issue
+        sip_path: Path to the SIP directory for this issue
     """
 
     id: str
@@ -28,5 +30,7 @@ class IssueTokenContent(BaseModel):
     articles: list[dict] = []
     mets_path: str | None = None
     validation_errors: list[str] = []
+    pip_path: str | None = None
+    sip_path: str | None = None
 
     model_config = {"extra": "allow"}  # Allow additional fields like 'log'

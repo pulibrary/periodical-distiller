@@ -20,6 +20,8 @@ class ArticleTokenContent(BaseModel):
         alto_paths: Paths to generated ALTO files
         page_count: Number of pages in the PDF
         error: Error message if processing failed
+        pip_path: Path to the PIP directory containing this article
+        sip_path: Path to the SIP directory for this article's derivatives
     """
 
     id: str
@@ -30,5 +32,7 @@ class ArticleTokenContent(BaseModel):
     alto_paths: list[str] = []
     page_count: int = 0
     error: str | None = None
+    pip_path: str | None = None
+    sip_path: str | None = None
 
     model_config = {"extra": "allow"}  # Allow additional fields like 'log'

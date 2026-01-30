@@ -130,7 +130,7 @@ class TestArticleTokenContent:
         )
 
         assert token.ceo_record is not None
-        assert token.ceo_record["headline"] == "Test Article Headline"
+        assert token.ceo_record.headline == "Test Article Headline"
 
     def test_article_token_allows_extra_fields(self):
         """ArticleTokenContent allows extra fields like 'log'."""

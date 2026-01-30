@@ -2,6 +2,8 @@
 
 from pydantic import BaseModel
 
+from schemas.ceo_item import CeoItem
+
 
 class ArticleTokenContent(BaseModel):
     """Schema for article token content.
@@ -12,7 +14,7 @@ class ArticleTokenContent(BaseModel):
     Attributes:
         id: Unique article identifier (CEO ID)
         issue_id: Parent issue identifier
-        ceo_record: Raw CEO3 record data
+        ceo_record: Validated CEO3 record data
         html_path: Path to generated HTML file
         pdf_path: Path to generated PDF file
         alto_paths: Paths to generated ALTO files
@@ -22,7 +24,7 @@ class ArticleTokenContent(BaseModel):
 
     id: str
     issue_id: str
-    ceo_record: dict | None = None
+    ceo_record: CeoItem | None = None
     html_path: str | None = None
     pdf_path: str | None = None
     alto_paths: list[str] = []

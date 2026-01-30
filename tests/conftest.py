@@ -25,19 +25,23 @@ def tmp_buckets(tmp_path):
 
 @pytest.fixture
 def sample_ceo_record():
-    """Sample CEO3 record for testing."""
+    """Sample CEO3 record for testing.
+
+    This matches the structure returned by the CEO3 API with properly
+    typed nested objects.
+    """
     return {
         "id": "12345",
         "uuid": "abc-123-def-456",
         "slug": "test-article-headline",
         "seo_title": "Test Article SEO Title",
         "seo_description": "Test article description for SEO",
-        "seo_image": "",
+        "seo_image": None,
         "headline": "Test Article Headline",
         "subhead": "A subheadline for testing",
         "abstract": "<p>This is the article abstract.</p>",
         "content": "<p>This is the main article content.</p><p>It has multiple paragraphs.</p>",
-        "infobox": "",
+        "infobox": None,
         "template": "standard",
         "short_token": "abc123",
         "status": "published",
@@ -46,15 +50,57 @@ def sample_ceo_record():
         "created_at": "2026-01-15 10:00:00",
         "modified_at": "2026-01-15 12:00:00",
         "published_at": "2026-01-15 14:00:00",
-        "metadata": "{}",
+        "metadata": [],
         "hits": "100",
         "normalized_tags": "",
         "ceo_id": "12345",
-        "ssts_id": "",
-        "ssts_path": "",
-        "tags": json.dumps([{"name": "Campus News"}, {"name": "University"}]),
-        "authors": json.dumps([{"name": "John Doe"}, {"name": "Jane Smith"}]),
-        "dominantMedia": "",
+        "ssts_id": None,
+        "ssts_path": None,
+        "tags": [
+            {
+                "id": "1",
+                "uuid": "tag-uuid-1",
+                "name": "Campus News",
+                "slug": "campus-news",
+                "ceo_id": "t1",
+                "metadata": None,
+            },
+            {
+                "id": "2",
+                "uuid": "tag-uuid-2",
+                "name": "University",
+                "slug": "university",
+                "ceo_id": "t2",
+                "metadata": None,
+            },
+        ],
+        "authors": [
+            {
+                "id": "a1",
+                "uuid": "author-uuid-1",
+                "name": "John Doe",
+                "email": "john@example.com",
+                "slug": "john-doe",
+                "bio": "",
+                "tagline": "",
+                "ceo_id": "author1",
+                "status": "active",
+                "metadata": None,
+            },
+            {
+                "id": "a2",
+                "uuid": "author-uuid-2",
+                "name": "Jane Smith",
+                "email": "jane@example.com",
+                "slug": "jane-smith",
+                "bio": "",
+                "tagline": "",
+                "ceo_id": "author2",
+                "status": "active",
+                "metadata": None,
+            },
+        ],
+        "dominantMedia": None,
     }
 
 

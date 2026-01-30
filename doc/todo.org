@@ -1,0 +1,24 @@
+#+TITLE: TODOs for Princeton Distiller
+
+* Ad Hoc TODOs
+** TODO [#C] Consider adding lxml type stubs
+:PROPERTIES:
+:CUSTOM_ID: add-lxml-type-stubs
+:ASSIGNEES: Claude
+:END:
+
+- Motivation :: In [[file:~/repos/gh/pulibrary/periodical-distiller/src/schemas/article.py][article.py]], basedpyright complains that =_Element= is
+not known.
+- Suggested Action :: Add type hints for lxml using [[https://github.com/lxml/lxml-stubs/blob/master/lxml-stubs/etree.pyi][lxml-stubs]].
+** DONE Create Pydantic schema for CEO3 Items
+:PROPERTIES:
+:ASSIGNEES: Claude
+:CUSTOM_ID: create-pydantic-schema-for-ceoitems
+:END:
+
+- Motivation :: The CEOClient needs this schema to validate data it
+  fetches; other components will use it to access record fields.
+
+*** References
+- [[https://docs.getsnworks.com/ceo2/front-end/json-api.html][CEO FrontEnd JSON API]]
+

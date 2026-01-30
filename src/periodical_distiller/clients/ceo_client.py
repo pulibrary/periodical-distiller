@@ -1,6 +1,6 @@
-"""CEO3 API client for fetching Daily Princetonian content."""
+"""CEO API client for fetching Daily Princetonian content."""
 
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from pydantic import ValidationError as PydanticValidationError
@@ -12,10 +12,11 @@ from .exceptions import ValidationError
 
 
 class CeoClient(Client):
-    """Client for the CEO3 headless CMS API.
+    """Client for the CEO headless CMS API.
 
-    Fetches article content from the Daily Princetonian's CEO3 API,
-    validating responses against the CeoItem schema.
+    Fetches article content from the Daily Princetonian's CEO API,
+    validating responses against the CeoItem schema. Uses the section
+    endpoint with client-side date filtering.
 
     Example:
         config = {"base_url": "https://www.dailyprincetonian.com"}
@@ -23,8 +24,8 @@ class CeoClient(Client):
             items = client.fetch_by_date(date(2026, 1, 15))
     """
 
-    API_PATH = "/api/content/v1/content"
-    DEFAULT_LIMIT = 100
+    API_PATH = "/section/news.json"
+    DEFAULT_PER_PAGE = 100
 
     def fetch(
         self,
@@ -34,7 +35,7 @@ class CeoClient(Client):
         offset: int = 0,
         validate: bool = True,
     ) -> list[CeoItem] | list[dict[str, Any]]:
-        """Fetch articles from the CEO3 API.
+        """Fetch articles from the CEO API.
 
         Args:
             date_start: Filter articles published on or after this date
@@ -52,37 +53,62 @@ class CeoClient(Client):
             ConnectionError: If the network connection fails
         """
         all_items: list[dict[str, Any]] = []
-        current_offset = offset
-        page_size = min(limit or self.DEFAULT_LIMIT, self.DEFAULT_LIMIT)
+        start_page = (offset // self.DEFAULT_PER_PAGE) + 1
+        current_page = start_page
         items_remaining = limit
+        reached_older_articles = False
 
-        while True:
-            params = self._build_params(date_start, date_end, page_size, current_offset)
+        while not reached_older_articles:
+            per_page = self.DEFAULT_PER_PAGE
+            if limit is not None and items_remaining is not None:
+                per_page = min(items_remaining, self.DEFAULT_PER_PAGE)
+
+            params = self._build_params(per_page, current_page)
             response = self.get(self.API_PATH, params=params)
             data = response.json()
 
-            items = data if isinstance(data, list) else data.get("items", [])
-
-            if not items:
+            articles = data.get("articles", [])
+            if not articles:
                 break
 
-            all_items.extend(items)
-            current_offset += len(items)
+            for article in articles:
+                pub_date = self._parse_published_date(article.get("published_at"))
 
-            if limit is not None:
-                items_remaining = limit - len(all_items)
-                if items_remaining <= 0:
-                    all_items = all_items[:limit]
+                if date_end is not None and pub_date > date_end:
+                    continue
+
+                if date_start is not None and pub_date < date_start:
+                    reached_older_articles = True
                     break
-                page_size = min(items_remaining, self.DEFAULT_LIMIT)
 
-            if len(items) < self.DEFAULT_LIMIT:
+                all_items.append(article)
+
+                if limit is not None:
+                    items_remaining = limit - len(all_items)
+                    if items_remaining <= 0:
+                        all_items = all_items[:limit]
+                        reached_older_articles = True
+                        break
+
+            current_page += 1
+            pagination = data.get("pagination", {})
+            if current_page > pagination.get("last", current_page):
                 break
 
         if validate:
             return self._validate_items(all_items)
 
         return all_items
+
+    def _parse_published_date(self, published_at: str | None) -> date:
+        """Parse the published_at timestamp to a date."""
+        if not published_at:
+            return date.min
+        try:
+            dt = datetime.strptime(published_at, "%Y-%m-%d %H:%M:%S")
+            return dt.date()
+        except ValueError:
+            return date.min
 
     def fetch_by_date(
         self, target_date: date, validate: bool = True
@@ -126,24 +152,19 @@ class CeoClient(Client):
 
     def _build_params(
         self,
-        date_start: date | None,
-        date_end: date | None,
-        limit: int,
-        offset: int,
+        per_page: int,
+        page: int,
     ) -> dict[str, Any]:
-        """Build query parameters for the API request."""
-        params: dict[str, Any] = {
-            "limit": limit,
-            "offset": offset,
+        """Build query parameters for the CEO API section request.
+
+        The section API uses:
+        - page: Page number (1-indexed)
+        - perPage: Items per page
+        """
+        return {
+            "page": page,
+            "perPage": per_page,
         }
-
-        if date_start is not None:
-            params["start_date"] = date_start.isoformat()
-
-        if date_end is not None:
-            params["end_date"] = date_end.isoformat()
-
-        return params
 
     def _validate_items(self, items: list[dict[str, Any]]) -> list[CeoItem]:
         """Validate a list of items against the CeoItem schema.

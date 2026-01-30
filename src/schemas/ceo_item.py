@@ -62,7 +62,7 @@ class CeoMedia(BaseModel):
     transcoded: str
     created_at: str
     modified_at: str
-    published_at: str
+    published_at: str | None = None
     normalized_tags: str | None = None
     ceo_id: str
     ssts_id: str | None = None

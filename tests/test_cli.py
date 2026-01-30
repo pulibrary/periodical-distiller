@@ -1,0 +1,198 @@
+"""Tests for the CLI module."""
+
+import json
+from datetime import date
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from periodical_distiller.cli import main
+
+
+class TestCLIHarvestPIP:
+    """Tests for the harvest-pip command."""
+
+    def test_harvest_pip_requires_date_arguments(self, caplog):
+        """harvest-pip fails without date arguments."""
+        result = main(["harvest-pip"])
+
+        assert result == 1
+        assert "Must specify either --date or both --start and --end" in caplog.text
+
+    def test_harvest_pip_rejects_mixed_arguments(self, caplog):
+        """harvest-pip fails with both --date and --start/--end."""
+        result = main([
+            "harvest-pip",
+            "--date", "2026-01-15",
+            "--start", "2026-01-15",
+            "--end", "2026-01-17",
+        ])
+
+        assert result == 1
+        assert "Cannot specify both --date and --start/--end" in caplog.text
+
+    def test_harvest_pip_rejects_partial_range(self, caplog):
+        """harvest-pip fails with only --start or only --end."""
+        result = main(["harvest-pip", "--start", "2026-01-15"])
+
+        assert result == 1
+        assert "Must specify either --date or both --start and --end" in caplog.text
+
+    @patch("periodical_distiller.cli.CeoClient")
+    def test_harvest_pip_single_date(
+        self, mock_client_class, tmp_path, sample_ceo_record
+    ):
+        """harvest-pip creates PIP for single date."""
+        from schemas.ceo_item import CeoItem
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.base_url = "https://www.dailyprincetonian.com"
+        mock_client.fetch_by_date = MagicMock(
+            return_value=[CeoItem.model_validate(sample_ceo_record)]
+        )
+        mock_client_class.return_value = mock_client
+
+        result = main([
+            "harvest-pip",
+            "--date", "2026-01-15",
+            "--output", str(tmp_path),
+        ])
+
+        assert result == 0
+        mock_client.fetch_by_date.assert_called_once_with(date(2026, 1, 15))
+        assert (tmp_path / "2026-01-15" / "pip-manifest.json").exists()
+
+    @patch("periodical_distiller.cli.CeoClient")
+    def test_harvest_pip_date_range(
+        self, mock_client_class, tmp_path, sample_ceo_record
+    ):
+        """harvest-pip creates PIP for date range."""
+        from schemas.ceo_item import CeoItem
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.base_url = "https://www.dailyprincetonian.com"
+        mock_client.fetch_by_date_range = MagicMock(
+            return_value=[CeoItem.model_validate(sample_ceo_record)]
+        )
+        mock_client_class.return_value = mock_client
+
+        result = main([
+            "harvest-pip",
+            "--start", "2026-01-15",
+            "--end", "2026-01-17",
+            "--output", str(tmp_path),
+        ])
+
+        assert result == 0
+        mock_client.fetch_by_date_range.assert_called_once_with(
+            date(2026, 1, 15), date(2026, 1, 17)
+        )
+        assert (tmp_path / "2026-01-15_to_2026-01-17" / "pip-manifest.json").exists()
+
+    @patch("periodical_distiller.cli.CeoClient")
+    def test_harvest_pip_creates_output_dir(
+        self, mock_client_class, tmp_path, sample_ceo_record
+    ):
+        """harvest-pip creates output directory if it doesn't exist."""
+        from schemas.ceo_item import CeoItem
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.base_url = "https://www.dailyprincetonian.com"
+        mock_client.fetch_by_date = MagicMock(
+            return_value=[CeoItem.model_validate(sample_ceo_record)]
+        )
+        mock_client_class.return_value = mock_client
+
+        output_dir = tmp_path / "nested" / "output"
+
+        result = main([
+            "harvest-pip",
+            "--date", "2026-01-15",
+            "--output", str(output_dir),
+        ])
+
+        assert result == 0
+        assert output_dir.exists()
+
+    @patch("periodical_distiller.cli.CeoClient")
+    def test_harvest_pip_custom_base_url(
+        self, mock_client_class, tmp_path, sample_ceo_record
+    ):
+        """harvest-pip accepts custom base URL."""
+        from schemas.ceo_item import CeoItem
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.base_url = "https://custom.example.com"
+        mock_client.fetch_by_date = MagicMock(
+            return_value=[CeoItem.model_validate(sample_ceo_record)]
+        )
+        mock_client_class.return_value = mock_client
+
+        result = main([
+            "harvest-pip",
+            "--date", "2026-01-15",
+            "--output", str(tmp_path),
+            "--base-url", "https://custom.example.com",
+        ])
+
+        assert result == 0
+        call_args = mock_client_class.call_args[0][0]
+        assert call_args["base_url"] == "https://custom.example.com"
+        assert "User-Agent" in call_args["headers"]
+
+    @patch("periodical_distiller.cli.CeoClient")
+    def test_harvest_pip_handles_exception(
+        self, mock_client_class, tmp_path, caplog
+    ):
+        """harvest-pip returns error code on exception."""
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.fetch_by_date = MagicMock(
+            side_effect=Exception("Network error")
+        )
+        mock_client_class.return_value = mock_client
+
+        result = main([
+            "harvest-pip",
+            "--date", "2026-01-15",
+            "--output", str(tmp_path),
+        ])
+
+        assert result == 1
+        assert "Failed to create PIP" in caplog.text
+
+
+class TestCLIMain:
+    """Tests for CLI main entry point."""
+
+    def test_no_command_shows_help(self, capsys):
+        """Running with no command shows help."""
+        result = main([])
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "usage:" in captured.out
+        assert "harvest-pip" in captured.out
+
+    def test_help_flag(self, capsys):
+        """Running with --help shows help."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["--help"])
+
+        assert exc_info.value.code == 0
+
+    def test_verbose_flag_accepted(self, capsys):
+        """Verbose flag is accepted."""
+        result = main(["-v", "harvest-pip"])
+
+        assert result == 1  # Fails due to missing date, but -v was accepted

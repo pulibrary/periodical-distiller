@@ -24,3 +24,40 @@ CLOSED: [2026-01-30]
 *** References
 - [[https://docs.getsnworks.com/ceo2/front-end/json-api.html][CEO FrontEnd JSON API]]
 
+** DONE Fix bug: API request fails with a 403 error                    :BUG:
+CLOSED: [2026-01-30]
+:PROPERTIES:
+:ASSIGNEES: Claude
+:CUSTOM_ID: API-request-fails
+:COMMIT: 99e6967
+:END:
+
+#+begin_src bash
+  pdm run python -m periodical_distiller.cli harvest-pip --date 2026-01-15
+  INFO: Fetching articles for 2026-01-15
+  INFO: HTTP Request: GET https://www.dailyprincetonian.com/api/content/v1/content?limit=100&offset=0&start_date=2026-01-15&end_date=2026-01-15 "HTTP/1.1 403 Forbidden"
+  ERROR: Failed to create PIP: API error 403: https://www.dailyprincetonian.com/api/content/v1/content?limit=100&offset=0&start_date=2026-01-15&end_date=2026-01-15
+#+end_src
+** DONE Fix bug: media requests fail with 404                          :BUG:
+CLOSED: [2026-01-31]
+:PROPERTIES:
+:ASSIGNEES: Claude
+:CUSTOM_ID: media-request-fails
+:END:
+- Root cause :: Incorrect imgix CDN URL format. Was using
+  ~{attachment_uuid}/{base_name}.{extension}~ but the correct format is
+  ~pri/{attachment_uuid}.sized-1000x1000.{extension}~.
+#+begin_src bash
+  pdm run python -m periodical_distiller.cli harvest-pip --date 2026-01-29
+  INFO: Fetching articles for 2026-01-29
+  INFO: HTTP Request: GET https://www.dailyprincetonian.com/section/news.json?page=1&perPage=100 "HTTP/1.1 200 OK"
+  INFO: HTTP Request: GET https://snworksceo.imgix.net/f1b219da-32c6-4256-9536-4d94f3b39289/annie-rupertus-spia-plaza-spring-2.jpg "HTTP/1.1 404 Not Found"
+  WARNING: Failed to download media for article 73628: HTTP 404
+  INFO: HTTP Request: GET https://snworksceo.imgix.net/075988f6-5052-4285-8512-c49c4209bbfb/img-2413.jpg "HTTP/1.1 404 Not Found"
+  WARNING: Failed to download media for article 73623: HTTP 404
+  INFO: Created PIP 2026-01-29 with 2 articles at workspace/pips/2026-01-29
+  INFO: Created PIP: 2026-01-29
+  INFO:   Title: The Daily Princetonian - January 29, 2026
+  INFO:   Articles: 2
+  INFO:   Output: workspace/pips/2026-01-29
+#+end_src

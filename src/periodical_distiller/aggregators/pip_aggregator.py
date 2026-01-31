@@ -5,6 +5,7 @@ import logging
 from datetime import date, datetime
 from pathlib import Path
 
+from periodical_distiller.aggregators.media_downloader import MediaDownloader
 from periodical_distiller.clients import CeoClient
 from schemas.ceo_item import CeoItem
 from schemas.pip import PIPArticle, PIPManifest, PreservationDescriptionInfo
@@ -25,15 +26,26 @@ class PIPAggregator:
             manifest = aggregator.create_pip_for_date(date(2026, 1, 15))
     """
 
-    def __init__(self, output_dir: Path, ceo_client: CeoClient):
+    def __init__(
+        self,
+        output_dir: Path,
+        ceo_client: CeoClient,
+        download_media: bool = True,
+        media_downloader: MediaDownloader | None = None,
+    ):
         """Initialize the PIP aggregator.
 
         Args:
             output_dir: Base directory for PIP output
             ceo_client: Client for fetching CEO3 content
+            download_media: Whether to download article media (default: True)
+            media_downloader: Optional MediaDownloader instance for dependency injection
         """
         self.output_dir = output_dir
         self.ceo_client = ceo_client
+        self.download_media = download_media
+        self._media_downloader = media_downloader
+        self._owns_downloader = media_downloader is None and download_media
 
     def create_pip(
         self,
@@ -59,6 +71,8 @@ class PIPAggregator:
 
         pip_articles: list[PIPArticle] = []
 
+        downloader = self._get_media_downloader() if self.download_media else None
+
         for article in articles:
             article_dir = articles_dir / article.ceo_id
             article_dir.mkdir(exist_ok=True)
@@ -68,12 +82,16 @@ class PIPAggregator:
                 article.model_dump_json(indent=2, by_alias=True)
             )
 
+            media_list = []
+            if downloader is not None:
+                media_list = downloader.download_article_media(article, article_dir)
+
             relative_path = f"articles/{article.ceo_id}/ceo_record.json"
             pip_articles.append(
                 PIPArticle(
                     ceo_id=article.ceo_id,
                     ceo_record_path=relative_path,
-                    media=[],
+                    media=media_list,
                 )
             )
             logger.debug(f"Saved article {article.ceo_id}: {article.headline}")
@@ -151,3 +169,9 @@ class PIPAggregator:
             date_range=(start.isoformat(), end.isoformat()),
             articles=articles,
         )
+
+    def _get_media_downloader(self) -> MediaDownloader:
+        """Get or create the media downloader instance."""
+        if self._media_downloader is None:
+            self._media_downloader = MediaDownloader()
+        return self._media_downloader

@@ -7,10 +7,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from periodical_distiller.aggregators import PIPAggregator
+from periodical_distiller.aggregators import MediaDownloader, PIPAggregator
 from periodical_distiller.clients import CeoClient
-from schemas.ceo_item import CeoItem
-from schemas.pip import PIPManifest
+from schemas.ceo_item import CeoItem, CeoMedia
+from schemas.pip import PIPManifest, PIPMedia
 
 
 @pytest.fixture
@@ -39,6 +39,58 @@ def sample_ceo_items(sample_ceo_record):
         record["headline"] = f"Test Article {i + 1}"
         items.append(CeoItem.model_validate(record))
     return items
+
+
+@pytest.fixture
+def sample_ceo_media():
+    """Create a sample CeoMedia object for testing."""
+    return CeoMedia(
+        id="m1",
+        uuid="media-uuid-123",
+        attachment_uuid="attach-uuid-456",
+        base_name="test-image",
+        extension="jpg",
+        preview_extension="jpg",
+        status="published",
+        weight="0",
+        hits="0",
+        transcoded="0",
+        created_at="2026-01-15 10:00:00",
+        modified_at="2026-01-15 12:00:00",
+        ceo_id="m1",
+    )
+
+
+@pytest.fixture
+def sample_ceo_items_with_media(sample_ceo_record, sample_ceo_media):
+    """Create sample CeoItem objects with dominant media."""
+    items = []
+    for i in range(3):
+        record = sample_ceo_record.copy()
+        record["id"] = str(12345 + i)
+        record["ceo_id"] = str(12345 + i)
+        record["uuid"] = f"uuid-{i}"
+        record["headline"] = f"Test Article {i + 1}"
+        media = sample_ceo_media.model_dump()
+        media["base_name"] = f"image-{i}"
+        record["dominantMedia"] = media
+        items.append(CeoItem.model_validate(record))
+    return items
+
+
+@pytest.fixture
+def mock_media_downloader():
+    """Create a mock MediaDownloader."""
+    downloader = MagicMock(spec=MediaDownloader)
+    downloader.download_article_media.return_value = [
+        PIPMedia(
+            original_url="https://example.com/image.jpg",
+            local_path="articles/12345/images/image.jpg",
+            media_type="image/jpeg",
+            checksum="abc123",
+        )
+    ]
+    return downloader
 
 
 class TestPIPAggregatorInit:
@@ -316,3 +368,128 @@ class TestPIPAggregatorCreatePIPForDateRange:
         )
 
         assert manifest.date_range == ("2026-01-15", "2026-01-17")
+
+
+class TestPIPAggregatorMediaDownload:
+    """Tests for PIPAggregator media download functionality."""
+
+    def test_init_download_media_default_true(self, tmp_path, mock_ceo_client):
+        """download_media defaults to True."""
+        aggregator = PIPAggregator(tmp_path, mock_ceo_client)
+        assert aggregator.download_media is True
+
+    def test_init_download_media_false(self, tmp_path, mock_ceo_client):
+        """download_media can be disabled."""
+        aggregator = PIPAggregator(tmp_path, mock_ceo_client, download_media=False)
+        assert aggregator.download_media is False
+
+    def test_init_accepts_media_downloader(
+        self, tmp_path, mock_ceo_client, mock_media_downloader
+    ):
+        """PIPAggregator accepts injected MediaDownloader."""
+        aggregator = PIPAggregator(
+            tmp_path, mock_ceo_client, media_downloader=mock_media_downloader
+        )
+        assert aggregator._media_downloader is mock_media_downloader
+
+    def test_create_pip_calls_media_downloader(
+        self, tmp_path, mock_ceo_client, sample_ceo_items, mock_media_downloader
+    ):
+        """create_pip() calls media downloader for each article."""
+        aggregator = PIPAggregator(
+            tmp_path, mock_ceo_client, media_downloader=mock_media_downloader
+        )
+
+        aggregator.create_pip(
+            issue_id="2026-01-15",
+            title="Test Issue",
+            date_range=("2026-01-15", "2026-01-15"),
+            articles=sample_ceo_items,
+        )
+
+        assert mock_media_downloader.download_article_media.call_count == 3
+
+    def test_create_pip_skips_media_download_when_disabled(
+        self, tmp_path, mock_ceo_client, sample_ceo_items, mock_media_downloader
+    ):
+        """create_pip() skips media download when download_media is False."""
+        aggregator = PIPAggregator(
+            tmp_path,
+            mock_ceo_client,
+            download_media=False,
+            media_downloader=mock_media_downloader,
+        )
+
+        manifest = aggregator.create_pip(
+            issue_id="2026-01-15",
+            title="Test Issue",
+            date_range=("2026-01-15", "2026-01-15"),
+            articles=sample_ceo_items,
+        )
+
+        mock_media_downloader.download_article_media.assert_not_called()
+        for article in manifest.articles:
+            assert article.media == []
+
+    def test_create_pip_includes_media_in_manifest(
+        self, tmp_path, mock_ceo_client, sample_ceo_items, mock_media_downloader
+    ):
+        """create_pip() includes downloaded media in manifest."""
+        aggregator = PIPAggregator(
+            tmp_path, mock_ceo_client, media_downloader=mock_media_downloader
+        )
+
+        manifest = aggregator.create_pip(
+            issue_id="2026-01-15",
+            title="Test Issue",
+            date_range=("2026-01-15", "2026-01-15"),
+            articles=sample_ceo_items,
+        )
+
+        for article in manifest.articles:
+            assert len(article.media) == 1
+            assert article.media[0].original_url == "https://example.com/image.jpg"
+            assert article.media[0].checksum == "abc123"
+
+    def test_create_pip_handles_download_failure_gracefully(
+        self, tmp_path, mock_ceo_client, sample_ceo_items, mock_media_downloader
+    ):
+        """create_pip() handles media download failures gracefully."""
+        mock_media_downloader.download_article_media.return_value = []
+        aggregator = PIPAggregator(
+            tmp_path, mock_ceo_client, media_downloader=mock_media_downloader
+        )
+
+        manifest = aggregator.create_pip(
+            issue_id="2026-01-15",
+            title="Test Issue",
+            date_range=("2026-01-15", "2026-01-15"),
+            articles=sample_ceo_items,
+        )
+
+        assert len(manifest.articles) == 3
+        for article in manifest.articles:
+            assert article.media == []
+
+    def test_create_pip_manifest_file_includes_media(
+        self, tmp_path, mock_ceo_client, sample_ceo_items, mock_media_downloader
+    ):
+        """create_pip() writes media to manifest file."""
+        aggregator = PIPAggregator(
+            tmp_path, mock_ceo_client, media_downloader=mock_media_downloader
+        )
+
+        aggregator.create_pip(
+            issue_id="2026-01-15",
+            title="Test Issue",
+            date_range=("2026-01-15", "2026-01-15"),
+            articles=sample_ceo_items,
+        )
+
+        manifest_path = tmp_path / "2026-01-15" / "pip-manifest.json"
+        manifest_data = json.loads(manifest_path.read_text())
+
+        for article in manifest_data["articles"]:
+            assert len(article["media"]) == 1
+            assert article["media"][0]["original_url"] == "https://example.com/image.jpg"
+            assert article["media"][0]["checksum"] == "abc123"

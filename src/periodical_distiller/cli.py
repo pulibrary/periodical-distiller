@@ -54,7 +54,9 @@ def harvest_pip(args: argparse.Namespace) -> int:
 
     try:
         with CeoClient(config) as client:
-            aggregator = PIPAggregator(output_dir, client)
+            aggregator = PIPAggregator(
+                output_dir, client, download_media=not args.no_media
+            )
 
             if args.date is not None:
                 logger.info(f"Fetching articles for {args.date}")
@@ -131,6 +133,11 @@ def main(argv: list[str] | None = None) -> int:
         type=str,
         default=DEFAULT_CEO_BASE_URL,
         help=f"CEO3 API base URL (default: {DEFAULT_CEO_BASE_URL})",
+    )
+    harvest_parser.add_argument(
+        "--no-media",
+        action="store_true",
+        help="Skip downloading article media",
     )
     harvest_parser.set_defaults(func=harvest_pip)
 

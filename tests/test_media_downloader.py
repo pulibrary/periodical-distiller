@@ -86,6 +86,20 @@ class TestMediaDownloaderContextManager:
         mock_http_client.close.assert_not_called()
 
 
+class TestMediaDownloaderClientConfig:
+    """Tests for HTTP client configuration."""
+
+    def test_client_follows_redirects(self):
+        """HTTP client is configured to follow redirects."""
+        downloader = MediaDownloader()
+        client = downloader._get_client()
+
+        # httpx Client should be configured with follow_redirects=True
+        assert client.follow_redirects is True
+
+        downloader.close()
+
+
 class TestBuildMediaUrl:
     """Tests for MediaDownloader._build_media_url()."""
 
@@ -107,6 +121,25 @@ class TestBuildMediaUrl:
 
         expected = "https://snworksceo.imgix.net/pri/attach-uuid-456.sized-1000x1000.png"
         assert url == expected
+
+    def test_build_media_url_heic_converts_to_jpg(self, sample_ceo_media):
+        """HEIC files are requested as JPG from imgix."""
+        sample_ceo_media.extension = "heic"
+        downloader = MediaDownloader()
+
+        url = downloader._build_media_url(sample_ceo_media)
+
+        expected = "https://snworksceo.imgix.net/pri/attach-uuid-456.sized-1000x1000.jpg"
+        assert url == expected
+
+    def test_build_media_url_heic_case_insensitive(self, sample_ceo_media):
+        """HEIC detection is case-insensitive."""
+        sample_ceo_media.extension = "HEIC"
+        downloader = MediaDownloader()
+
+        url = downloader._build_media_url(sample_ceo_media)
+
+        assert url.endswith(".jpg")
 
 
 class TestComputeChecksum:
@@ -293,3 +326,393 @@ class TestDownloadArticleMedia:
 
         expected_checksum = hashlib.sha256(test_content).hexdigest()
         assert result[0].checksum == expected_checksum
+
+    def test_download_article_media_heic_converted_to_jpg(
+        self, tmp_path, sample_ceo_record, sample_ceo_media, mock_http_client
+    ):
+        """HEIC files are downloaded as JPG with correct extension and mime type."""
+        sample_ceo_media.extension = "heic"
+        record = sample_ceo_record.copy()
+        record["dominantMedia"] = sample_ceo_media.model_dump()
+        article = CeoItem.model_validate(record)
+
+        mock_response = MagicMock()
+        mock_response.content = b"fake jpg data"
+        mock_http_client.get.return_value = mock_response
+
+        downloader = MediaDownloader(http_client=mock_http_client)
+        article_dir = tmp_path / "articles" / "12345"
+        article_dir.mkdir(parents=True)
+
+        result = downloader.download_article_media(article, article_dir)
+
+        assert len(result) == 1
+        # File should be saved as .jpg, not .heic
+        assert result[0].local_path.endswith(".jpg")
+        assert result[0].media_type == "image/jpeg"
+        # URL should request .jpg extension
+        assert result[0].original_url.endswith(".jpg")
+
+        # Verify file exists with correct name
+        image_path = article_dir / "images" / "test-image.jpg"
+        assert image_path.exists()
+
+    def test_download_article_media_heic_tries_fallback_urls(
+        self, tmp_path, sample_ceo_record, sample_ceo_media, mock_http_client
+    ):
+        """HEIC files try multiple URL formats: jpg and png, sized and unsized.
+
+        Some HEIC files uploaded to CEO3 are converted to PNG on imgix.
+        The downloader should try jpg first, then png as fallbacks.
+
+        Real-world example: article 73405 has HEIC that's stored as PNG:
+        https://snworksceo.imgix.net/pri/1348d282-34ee-4cae-a78c-d4ae7c0f8e12.sized-1000x1000.png
+        """
+        sample_ceo_media.extension = "heic"
+        sample_ceo_media.attachment_uuid = "1348d282-34ee-4cae-a78c-d4ae7c0f8e12"
+        record = sample_ceo_record.copy()
+        record["dominantMedia"] = sample_ceo_media.model_dump()
+        article = CeoItem.model_validate(record)
+
+        # First request (sized jpg) returns 404, second (sized png) succeeds
+        mock_404_response = MagicMock()
+        mock_404_response.status_code = 404
+        mock_success_response = MagicMock()
+        mock_success_response.content = b"fake png data"
+
+        mock_http_client.get.side_effect = [
+            httpx.HTTPStatusError(
+                "Not Found", request=MagicMock(), response=mock_404_response
+            ),
+            mock_success_response,
+        ]
+
+        downloader = MediaDownloader(http_client=mock_http_client)
+        article_dir = tmp_path / "articles" / "12345"
+        article_dir.mkdir(parents=True)
+
+        result = downloader.download_article_media(article, article_dir)
+
+        # Should succeed via fallback URL
+        assert len(result) == 1
+        assert result[0].local_path.endswith(".jpg")
+
+        # Should have tried two URLs
+        assert mock_http_client.get.call_count == 2
+
+        # First call should be sized jpg
+        first_call_url = mock_http_client.get.call_args_list[0][0][0]
+        assert "sized-1000x1000.jpg" in first_call_url
+
+        # Second call should be sized png
+        second_call_url = mock_http_client.get.call_args_list[1][0][0]
+        assert "sized-1000x1000.png" in second_call_url
+
+
+class TestExtractFlourishUrls:
+    """Tests for MediaDownloader._extract_flourish_urls()."""
+
+    def test_extract_flourish_urls_with_single_chart(self):
+        """Extracts a single Flourish thumbnail URL."""
+        downloader = MediaDownloader()
+        content = """
+        <figure><div class="embed-code">
+          <div class="flourish-embed flourish-chart" data-src="visualisation/25705049">
+            <script src="https://public.flourish.studio/resources/embed.js"></script>
+            <noscript>
+              <img src="https://public.flourish.studio/visualisation/25705049/thumbnail"
+                   width="100%" alt="chart visualization"/>
+            </noscript>
+          </div>
+        </div></figure>
+        """
+
+        result = downloader._extract_flourish_urls(content)
+
+        assert len(result) == 1
+        assert result[0] == (
+            "25705049",
+            "https://public.flourish.studio/visualisation/25705049/thumbnail",
+        )
+
+    def test_extract_flourish_urls_with_multiple_charts(self):
+        """Extracts multiple Flourish thumbnail URLs."""
+        downloader = MediaDownloader()
+        content = """
+        <figure>
+          <noscript>
+            <img src="https://public.flourish.studio/visualisation/11111111/thumbnail"/>
+          </noscript>
+        </figure>
+        <figure>
+          <noscript>
+            <img src="https://public.flourish.studio/visualisation/22222222/thumbnail"/>
+          </noscript>
+        </figure>
+        """
+
+        result = downloader._extract_flourish_urls(content)
+
+        assert len(result) == 2
+        assert result[0][0] == "11111111"
+        assert result[1][0] == "22222222"
+
+    def test_extract_flourish_urls_with_no_charts(self):
+        """Returns empty list when no Flourish charts are present."""
+        downloader = MediaDownloader()
+        content = "<p>This is just regular HTML content with no charts.</p>"
+
+        result = downloader._extract_flourish_urls(content)
+
+        assert result == []
+
+    def test_extract_flourish_urls_with_none_content(self):
+        """Returns empty list when content is None."""
+        downloader = MediaDownloader()
+
+        result = downloader._extract_flourish_urls(None)
+
+        assert result == []
+
+    def test_extract_flourish_urls_with_empty_content(self):
+        """Returns empty list when content is empty string."""
+        downloader = MediaDownloader()
+
+        result = downloader._extract_flourish_urls("")
+
+        assert result == []
+
+    def test_extract_flourish_urls_deduplicates(self):
+        """Removes duplicate visualization IDs."""
+        downloader = MediaDownloader()
+        content = """
+        <img src="https://public.flourish.studio/visualisation/12345/thumbnail"/>
+        <img src="https://public.flourish.studio/visualisation/12345/thumbnail"/>
+        """
+
+        result = downloader._extract_flourish_urls(content)
+
+        assert len(result) == 1
+        assert result[0][0] == "12345"
+
+
+class TestDownloadFlourishCharts:
+    """Tests for MediaDownloader._download_flourish_charts()."""
+
+    @pytest.fixture
+    def sample_article_with_flourish(self, sample_ceo_record):
+        """Create a sample CeoItem with Flourish chart in content."""
+        record = sample_ceo_record.copy()
+        record["content"] = """
+        <p>Here is some analysis.</p>
+        <figure><div class="embed-code">
+          <div class="flourish-embed flourish-chart" data-src="visualisation/25705049">
+            <noscript>
+              <img src="https://public.flourish.studio/visualisation/25705049/thumbnail"/>
+            </noscript>
+          </div>
+        </div></figure>
+        <p>More text after chart.</p>
+        """
+        return CeoItem.model_validate(record)
+
+    @pytest.fixture
+    def sample_article_with_multiple_flourish(self, sample_ceo_record):
+        """Create a sample CeoItem with multiple Flourish charts."""
+        record = sample_ceo_record.copy()
+        record["content"] = """
+        <img src="https://public.flourish.studio/visualisation/11111111/thumbnail"/>
+        <img src="https://public.flourish.studio/visualisation/22222222/thumbnail"/>
+        """
+        return CeoItem.model_validate(record)
+
+    def test_download_flourish_charts_success(
+        self, tmp_path, sample_article_with_flourish, mock_http_client
+    ):
+        """Downloads Flourish chart and returns PIPMedia."""
+        mock_response = MagicMock()
+        mock_response.content = b"fake png data"
+        mock_http_client.get.return_value = mock_response
+
+        downloader = MediaDownloader(http_client=mock_http_client)
+        article_dir = tmp_path / "articles" / "12345"
+        article_dir.mkdir(parents=True)
+
+        result = downloader._download_flourish_charts(
+            sample_article_with_flourish, article_dir
+        )
+
+        assert len(result) == 1
+        assert result[0].original_url == (
+            "https://public.flourish.studio/visualisation/25705049/thumbnail"
+        )
+        assert result[0].local_path == "articles/12345/charts/flourish-25705049.png"
+        assert result[0].media_type == "image/png"
+        assert result[0].checksum is not None
+
+        chart_path = article_dir / "charts" / "flourish-25705049.png"
+        assert chart_path.exists()
+        assert chart_path.read_bytes() == b"fake png data"
+
+    def test_download_flourish_charts_creates_charts_dir(
+        self, tmp_path, sample_article_with_flourish, mock_http_client
+    ):
+        """Creates charts directory if it doesn't exist."""
+        mock_response = MagicMock()
+        mock_response.content = b"fake png data"
+        mock_http_client.get.return_value = mock_response
+
+        downloader = MediaDownloader(http_client=mock_http_client)
+        article_dir = tmp_path / "articles" / "12345"
+        article_dir.mkdir(parents=True)
+
+        downloader._download_flourish_charts(sample_article_with_flourish, article_dir)
+
+        charts_dir = article_dir / "charts"
+        assert charts_dir.exists()
+        assert charts_dir.is_dir()
+
+    def test_download_flourish_charts_multiple(
+        self, tmp_path, sample_article_with_multiple_flourish, mock_http_client
+    ):
+        """Downloads multiple Flourish charts."""
+        mock_response = MagicMock()
+        mock_response.content = b"fake png data"
+        mock_http_client.get.return_value = mock_response
+
+        downloader = MediaDownloader(http_client=mock_http_client)
+        article_dir = tmp_path / "articles" / "12345"
+        article_dir.mkdir(parents=True)
+
+        result = downloader._download_flourish_charts(
+            sample_article_with_multiple_flourish, article_dir
+        )
+
+        assert len(result) == 2
+        assert result[0].local_path == "articles/12345/charts/flourish-11111111.png"
+        assert result[1].local_path == "articles/12345/charts/flourish-22222222.png"
+
+    def test_download_flourish_charts_no_charts(
+        self, tmp_path, sample_ceo_item_no_media
+    ):
+        """Returns empty list when article has no Flourish charts."""
+        downloader = MediaDownloader()
+        article_dir = tmp_path / "articles" / "12345"
+        article_dir.mkdir(parents=True)
+
+        result = downloader._download_flourish_charts(
+            sample_ceo_item_no_media, article_dir
+        )
+
+        assert result == []
+
+    def test_download_flourish_charts_http_error(
+        self, tmp_path, sample_article_with_flourish, mock_http_client
+    ):
+        """Returns empty list on HTTP error."""
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        error = httpx.HTTPStatusError(
+            "Not Found", request=MagicMock(), response=mock_response
+        )
+        mock_http_client.get.side_effect = error
+
+        downloader = MediaDownloader(http_client=mock_http_client)
+        article_dir = tmp_path / "articles" / "12345"
+        article_dir.mkdir(parents=True)
+
+        result = downloader._download_flourish_charts(
+            sample_article_with_flourish, article_dir
+        )
+
+        assert result == []
+
+    def test_download_flourish_charts_partial_failure(
+        self, tmp_path, sample_article_with_multiple_flourish, mock_http_client
+    ):
+        """Downloads successful charts even when some fail."""
+        mock_response = MagicMock()
+        mock_response.content = b"fake png data"
+
+        mock_error_response = MagicMock()
+        mock_error_response.status_code = 500
+
+        # First call succeeds, second fails
+        mock_http_client.get.side_effect = [
+            mock_response,
+            httpx.HTTPStatusError(
+                "Server Error", request=MagicMock(), response=mock_error_response
+            ),
+        ]
+
+        downloader = MediaDownloader(http_client=mock_http_client)
+        article_dir = tmp_path / "articles" / "12345"
+        article_dir.mkdir(parents=True)
+
+        result = downloader._download_flourish_charts(
+            sample_article_with_multiple_flourish, article_dir
+        )
+
+        # Only the first chart should be returned
+        assert len(result) == 1
+        assert result[0].local_path == "articles/12345/charts/flourish-11111111.png"
+
+
+class TestDownloadArticleMediaWithFlourish:
+    """Tests for download_article_media including Flourish charts."""
+
+    @pytest.fixture
+    def sample_article_with_media_and_flourish(self, sample_ceo_record, sample_ceo_media):
+        """Create a sample CeoItem with both dominant media and Flourish chart."""
+        record = sample_ceo_record.copy()
+        record["dominantMedia"] = sample_ceo_media.model_dump()
+        record["content"] = """
+        <p>Article text.</p>
+        <img src="https://public.flourish.studio/visualisation/99999999/thumbnail"/>
+        """
+        return CeoItem.model_validate(record)
+
+    def test_download_article_media_includes_flourish(
+        self, tmp_path, sample_article_with_media_and_flourish, mock_http_client
+    ):
+        """Downloads both dominant media and Flourish charts."""
+        mock_response = MagicMock()
+        mock_response.content = b"fake image data"
+        mock_http_client.get.return_value = mock_response
+
+        downloader = MediaDownloader(http_client=mock_http_client)
+        article_dir = tmp_path / "articles" / "12345"
+        article_dir.mkdir(parents=True)
+
+        result = downloader.download_article_media(
+            sample_article_with_media_and_flourish, article_dir
+        )
+
+        assert len(result) == 2
+        # First should be dominant media
+        assert "images/test-image.jpg" in result[0].local_path
+        # Second should be Flourish chart
+        assert "charts/flourish-99999999.png" in result[1].local_path
+
+    def test_download_article_media_flourish_only(
+        self, tmp_path, sample_ceo_record, mock_http_client
+    ):
+        """Downloads Flourish charts when no dominant media."""
+        record = sample_ceo_record.copy()
+        record["content"] = """
+        <img src="https://public.flourish.studio/visualisation/12345678/thumbnail"/>
+        """
+        article = CeoItem.model_validate(record)
+
+        mock_response = MagicMock()
+        mock_response.content = b"fake png data"
+        mock_http_client.get.return_value = mock_response
+
+        downloader = MediaDownloader(http_client=mock_http_client)
+        article_dir = tmp_path / "articles" / "12345"
+        article_dir.mkdir(parents=True)
+
+        result = downloader.download_article_media(article, article_dir)
+
+        assert len(result) == 1
+        assert "charts/flourish-12345678.png" in result[0].local_path

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from periodical_distiller.aggregators import PIPAggregator
 from periodical_distiller.clients import CeoClient
-from periodical_distiller.transformers import HTMLTransformer
+from periodical_distiller.transformers import HTMLTransformer, PDFTransformer
 
 DEFAULT_OUTPUT_DIR = Path("./workspace/pips")
 DEFAULT_SIP_OUTPUT_DIR = Path("./workspace/sips")
@@ -126,6 +126,49 @@ def transform_html(args: argparse.Namespace) -> int:
         return 1
 
 
+def transform_pdf(args: argparse.Namespace) -> int:
+    """Execute the transform-pdf command.
+
+    Args:
+        args: Parsed command-line arguments
+
+    Returns:
+        Exit code (0 for success, non-zero for errors)
+    """
+    setup_logging(args.verbose)
+    logger = logging.getLogger(__name__)
+
+    sip_path = args.sip.resolve()
+    if not sip_path.exists():
+        logger.error(f"SIP directory not found: {sip_path}")
+        return 1
+
+    manifest_path = sip_path / "sip-manifest.json"
+    if not manifest_path.exists():
+        logger.error(f"SIP manifest not found: {manifest_path}")
+        return 1
+
+    try:
+        transformer = PDFTransformer()
+        manifest = transformer.transform(sip_path)
+
+        pdf_count = sum(1 for a in manifest.articles if a.pdf_path)
+        logger.info(f"Transformed SIP: {manifest.id}")
+        logger.info(f"  PDFs generated: {pdf_count}")
+        logger.info(f"  Output: {sip_path}")
+
+        if manifest.validation_errors:
+            logger.warning(f"  Errors: {len(manifest.validation_errors)}")
+            for error in manifest.validation_errors:
+                logger.warning(f"    - {error}")
+
+        return 0
+
+    except Exception as e:
+        logger.error(f"Failed to transform SIP to PDF: {e}")
+        return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     """Main entry point for the CLI.
 
@@ -208,6 +251,19 @@ def main(argv: list[str] | None = None) -> int:
         help=f"Output directory for SIPs (default: {DEFAULT_SIP_OUTPUT_DIR})",
     )
     transform_parser.set_defaults(func=transform_html)
+
+    pdf_parser = subparsers.add_parser(
+        "transform-pdf",
+        help="Transform HTML files in a SIP to PDF",
+        description="Transform HTML articles in a Submission Information Package (SIP) to PDF format using WeasyPrint.",
+    )
+    pdf_parser.add_argument(
+        "--sip",
+        type=Path,
+        required=True,
+        help="Path to the SIP directory containing HTML files",
+    )
+    pdf_parser.set_defaults(func=transform_pdf)
 
     args = parser.parse_args(argv)
 

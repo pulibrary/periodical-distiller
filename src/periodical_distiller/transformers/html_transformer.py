@@ -17,7 +17,7 @@ from schemas.pip import PIPManifest
 from schemas.sip import SIPArticle, SIPManifest
 
 from .filters import FILTERS
-from .transformer import Transformer
+from .transformer import PIPTransformer
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ TEMPLATES_DIR = PACKAGE_ROOT / "resources" / "templates"
 STYLESHEETS_DIR = PACKAGE_ROOT / "resources" / "stylesheets"
 
 
-class HTMLTransformer(Transformer):
+class HTMLTransformer(PIPTransformer):
     """Transform CEO3 articles from PIPs into styled HTML in SIPs.
 
     The HTMLTransformer:

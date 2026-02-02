@@ -1,7 +1,9 @@
-"""Base class for transformers.
+"""Base classes for transformers.
 
-Transformers convert content from PIPs into derivatives stored in SIPs.
-Each transformer type produces a specific output format (HTML, PDF, ALTO, etc.).
+Transformers convert content between pipeline stages. There are two types:
+
+- PIPTransformer: Creates a new SIP from PIP content (e.g., HTMLTransformer)
+- SIPTransformer: Enriches an existing SIP with derivatives (e.g., PDFTransformer)
 """
 
 from abc import ABC, abstractmethod
@@ -10,22 +12,46 @@ from pathlib import Path
 from schemas.sip import SIPManifest
 
 
-class Transformer(ABC):
-    """Abstract base class for all transformers.
+class PIPTransformer(ABC):
+    """Abstract base class for PIP-to-SIP transformers.
 
-    Transformers read sealed PIPs and produce derivatives in SIPs.
-    Each transformer is responsible for one type of output.
+    PIPTransformers read sealed PIPs and produce new SIPs.
+    They are typically the first transformer in a pipeline.
     """
 
     @abstractmethod
     def transform(self, pip_path: Path, sip_path: Path) -> SIPManifest:
-        """Transform PIP content into SIP derivatives.
+        """Transform PIP content into a new SIP.
 
         Args:
             pip_path: Path to the sealed PIP directory
-            sip_path: Path to the SIP directory to create/update
+            sip_path: Path to the SIP directory to create
 
         Returns:
             SIPManifest describing the transformed content
         """
         pass
+
+
+class SIPTransformer(ABC):
+    """Abstract base class for SIP-to-SIP transformers.
+
+    SIPTransformers enrich existing SIPs with additional derivatives.
+    They operate on SIPs that already contain some content (e.g., HTML).
+    """
+
+    @abstractmethod
+    def transform(self, sip_path: Path) -> SIPManifest:
+        """Enrich a SIP with additional derivatives.
+
+        Args:
+            sip_path: Path to the existing SIP directory
+
+        Returns:
+            SIPManifest with updated derivative paths
+        """
+        pass
+
+
+# Backwards compatibility alias
+Transformer = PIPTransformer

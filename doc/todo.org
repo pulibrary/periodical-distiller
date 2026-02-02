@@ -176,3 +176,18 @@ be others.
 Download a sampling of CEO records and gather values from the
 dominantMedia["type"] property; put these in a report called
 "dominant-media-types.org".
+** DONE [#A] PDFTransformer.transform signature doesn't match base class
+CLOSED: [2026-02-02]
+:PROPERTIES:
+:CUSTOM_ID: pdftransformer.transform-signature-does-not-match
+:ASSIGNEES: Claude
+:END:
+The base Transformer class takes a pip_path as an argument but
+PDFTransformer.transform does not, because the PDFTransformer class
+doesn't need it. This causes basedpyright to complain.  Explain the
+right fix before implementing it.
+
+- Resolution :: Split Transformer into two base classes:
+  - ~PIPTransformer~: PIP→SIP transformers (e.g., HTMLTransformer)
+  - ~SIPTransformer~: SIP→SIP enrichment (e.g., PDFTransformer)
+  - ~Transformer~ kept as alias for backwards compatibility

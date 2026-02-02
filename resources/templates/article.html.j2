@@ -56,6 +56,28 @@
         .content a {
             color: #0066cc;
         }
+        .featured-image {
+            width: 100%;
+            text-align: center;
+            margin: 1cm 0;
+        }
+        .featured-image img {
+            max-width: 70%;
+            height: auto;
+        }
+        .image-caption {
+            font-size: 9pt;
+            color: #666;
+            font-style: italic;
+            margin-top: 0.2cm;
+            text-align: center;
+        }
+        .image-credit {
+            font-size: 8pt;
+            color: #888;
+            margin-top: 0.1cm;
+            text-align: center;
+        }
         .chart-image {
             text-align: center;
             margin: 1cm 0;
@@ -88,6 +110,18 @@
             {% if item.subhead %}
             <div class="subhead">{{ item.subhead }}</div>
             {% endif %}
+            {% if featured_image_path and item.dominant_media and item.dominant_media.type == 'image' %}
+            {% set media_info = item.dominant_media.content | parse_media_caption %}
+            <div class="featured-image">
+                <img src="{{ featured_image_path }}" alt="{{ media_info.caption or item.headline }}">
+                {% if media_info.caption %}
+                <div class="image-caption">{{ media_info.caption }}</div>
+                {% endif %}
+                {% if media_info.credit %}
+                <div class="image-credit">{{ media_info.credit }}</div>
+                {% endif %}
+            </div>
+            {% endif %}
             <div class="meta">
                 <span class="meta-item">
                     <strong>Published:</strong>
@@ -109,7 +143,7 @@
         {% endif %}
 
         <div class="content">
-            {{ item.content | clean_content | safe }}
+            {% if content %}{{ content | clean_content | safe }}{% else %}{{ item.content | clean_content | safe }}{% endif %}
         </div>
 
         {% if item.tags %}

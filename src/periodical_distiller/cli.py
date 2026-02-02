@@ -8,8 +8,10 @@ from pathlib import Path
 
 from periodical_distiller.aggregators import PIPAggregator
 from periodical_distiller.clients import CeoClient
+from periodical_distiller.transformers import HTMLTransformer
 
 DEFAULT_OUTPUT_DIR = Path("./workspace/pips")
+DEFAULT_SIP_OUTPUT_DIR = Path("./workspace/sips")
 DEFAULT_CEO_BASE_URL = "https://www.dailyprincetonian.com"
 
 
@@ -77,6 +79,53 @@ def harvest_pip(args: argparse.Namespace) -> int:
         return 1
 
 
+def transform_html(args: argparse.Namespace) -> int:
+    """Execute the transform-html command.
+
+    Args:
+        args: Parsed command-line arguments
+
+    Returns:
+        Exit code (0 for success, non-zero for errors)
+    """
+    setup_logging(args.verbose)
+    logger = logging.getLogger(__name__)
+
+    pip_path = args.pip.resolve()
+    if not pip_path.exists():
+        logger.error(f"PIP directory not found: {pip_path}")
+        return 1
+
+    manifest_path = pip_path / "pip-manifest.json"
+    if not manifest_path.exists():
+        logger.error(f"PIP manifest not found: {manifest_path}")
+        return 1
+
+    output_dir = args.output
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    sip_path = output_dir / pip_path.name
+
+    try:
+        transformer = HTMLTransformer()
+        manifest = transformer.transform(pip_path, sip_path)
+
+        logger.info(f"Created SIP: {manifest.id}")
+        logger.info(f"  Articles: {len(manifest.articles)}")
+        logger.info(f"  Output: {sip_path}")
+
+        if manifest.validation_errors:
+            logger.warning(f"  Errors: {len(manifest.validation_errors)}")
+            for error in manifest.validation_errors:
+                logger.warning(f"    - {error}")
+
+        return 0
+
+    except Exception as e:
+        logger.error(f"Failed to transform PIP: {e}")
+        return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     """Main entry point for the CLI.
 
@@ -140,6 +189,25 @@ def main(argv: list[str] | None = None) -> int:
         help="Skip downloading article media",
     )
     harvest_parser.set_defaults(func=harvest_pip)
+
+    transform_parser = subparsers.add_parser(
+        "transform-html",
+        help="Transform a PIP into a SIP with HTML files",
+        description="Transform a Primary Information Package (PIP) into a Submission Information Package (SIP) containing styled HTML articles.",
+    )
+    transform_parser.add_argument(
+        "--pip",
+        type=Path,
+        required=True,
+        help="Path to the PIP directory to transform",
+    )
+    transform_parser.add_argument(
+        "--output",
+        type=Path,
+        default=DEFAULT_SIP_OUTPUT_DIR,
+        help=f"Output directory for SIPs (default: {DEFAULT_SIP_OUTPUT_DIR})",
+    )
+    transform_parser.set_defaults(func=transform_html)
 
     args = parser.parse_args(argv)
 

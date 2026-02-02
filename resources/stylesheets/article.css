@@ -107,6 +107,16 @@ h1 {
     margin-right: auto;
 }
 
+.image-credit {
+    font-size: 8pt;
+    color: #888;
+    margin-top: 0.1cm;
+    text-align: center;
+    max-width: 70%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
 .chart-image {
     width: 100%;
     text-align: center;

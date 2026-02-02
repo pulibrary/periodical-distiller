@@ -106,55 +106,73 @@ CLOSED: [2026-01-31]
      INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/1348d282-34ee-4cae-a78c-d4ae7c0f8e12.sized-1000x1000.heic?fm=jpg "HTTP/1.1 404 Not Found"
      WARNING: Failed to download media for article 73405: HTTP 404
    #+end_example
-*** Example of run with warnings
-#+begin_src bash
-  pdm run python -m periodical_distiller.cli harvest-pip --start 2025-12-01 --end 2025-12-31
-  INFO: Fetching articles from 2025-12-01 to 2025-12-31
-  INFO: HTTP Request: GET https://www.dailyprincetonian.com/section/news.json?page=1&perPage=100 "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://www.dailyprincetonian.com/section/news.json?page=2&perPage=100 "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://www.dailyprincetonian.com/section/news.json?page=3&perPage=100 "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/78247f7f-86eb-43cc-bfe9-0ce9fd8c4fa7.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/a27b9250-8e67-4c42-a829-768a8a36154f.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/9335c9cc-5fb2-4105-b957-70760bd13819.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/049a5cf5-95a8-46d5-b71c-1071851c3b8c.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/20f26a01-f19d-49e0-9735-48d840bba8a7.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/6095c9a0-5e6d-4e85-8c1d-b1ab6e8f26d9.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/bb75da69-4e6c-49f2-a3b1-e8dc83140684.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/02239673-3c9d-41e2-a2d2-ecbd7e76dec6.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/2072a361-eea7-4f6f-8319-8d49241b704c.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/a51cf533-66ca-4bf6-855d-c2114d2aa7e3.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/31196c9c-4241-4cdc-8b75-fbc8bb880a47.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/e3afdc2e-0ebf-4efe-a38f-f0096f7302f5.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/73075927-109d-4382-beaa-dd49b66d5807.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/706885db-efcb-4db1-99a7-1d61d34967e2.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/a045b640-1749-4bb7-8177-39d1e1889cac.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/6962fb33-f162-4369-ad9d-1004ab0f5239.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://public.flourish.studio/visualisation/26729538/thumbnail "HTTP/1.1 302 Found"
-  WARNING: Failed to download Flourish chart 26729538 for article 73431: HTTP 302
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/d80e84f1-86ec-4c93-8c41-7d79ffd5b421.sized-1000x1000.JPG "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/3f1ba838-7da8-4803-a446-f68dc287a6ae.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/c4b2958b-f7f3-414e-94de-6be7c7ff0ec2.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/03d15d3a-c5f9-4036-8f5b-a482d87d7d79.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/095c052a-5d8e-4408-9549-fef57f23f9cf.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/1a55e492-28fb-4cd4-b2a9-81bc32da6c10.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/1348d282-34ee-4cae-a78c-d4ae7c0f8e12.sized-1000x1000.heic "HTTP/1.1 404 Not Found"
-  WARNING: Failed to download media for article 73405: HTTP 404
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/6ce86fa9-c9f6-4baa-9520-ad123640c783.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/2acde15b-8055-4852-a457-01c92d481f89.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/7a84b9ed-95ce-46bc-98da-40726f471bb1.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/fbac5f2e-fc66-44f2-b027-f8d6ad43e636.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/cb14b6e0-0727-481f-a6f3-d8c3338cd2d0.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/87a8c069-7228-487a-a020-d5d3d011aaf9.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/f13358c9-c675-4bde-8b9c-f59657c707e3.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/2a9fa40b-f4ff-463e-983f-7a604b6b75ca.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/0d374239-a19c-40d8-b6cc-f9fb0be36beb.sized-1000x1000.heic "HTTP/1.1 404 Not Found"
-  WARNING: Failed to download media for article 73351: HTTP 404
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/dfaa43a0-d2c9-4557-8066-4f8a74d8ebd0.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/a85efd82-45f1-4819-82bd-02052d365bc6.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: HTTP Request: GET https://snworksceo.imgix.net/pri/5c392e4c-5e8f-4b93-b0f2-b513cc2f1005.sized-1000x1000.jpg "HTTP/1.1 200 OK"
-  INFO: Created PIP 2025-12-01_to_2025-12-31 with 35 articles at workspace/pips/2025-12-01_to_2025-12-31
-  INFO: Created PIP: 2025-12-01_to_2025-12-31
-  INFO:   Title: The Daily Princetonian - December 01, 2025 to December 31, 2025
-  INFO:   Articles: 35
-  INFO:   Output: workspace/pips/2025-12-01_to_2025-12-31
-#+end_src
+** DONE Fix bug: output from HTML transformer does not include dominant media :BUG:
+CLOSED: [2026-02-02]
+:PROPERTIES:
+:CUSTOM_ID: html-transformer-output-does-not-include-dominant-media
+:ASSIGNEES: Claude
+:END:
+The CEO record includes a "dominantMedia" property that provides metadata about a block of content that
+should appear below the headline and before the byline. Here is an example:
+
+#+begin_example
+    "dominantMedia": {
+      "id": "19166",
+      "uuid": "4ef275d7-a74b-4ae3-8d1e-3e49e904d274",
+      "attachment_uuid": "075988f6-5052-4285-8512-c49c4209bbfb",
+      "base_name": "img-2413",
+      "extension": "jpg",
+      "preview_extension": "jpg",
+      "title": "marquand library photo",
+      "content": "<h5>View of campus from the third floor of Marquand Library. </h5><h6>Leela Hensler / The Daily Princetonian</h6>",
+      "source": null,
+      "click_through": null,
+      "type": "image",
+      "height": null,
+      "width": null,
+      "seo_title": null,
+      "seo_description": null,
+      "seo_image": null,
+      "svg_preview": null,
+      "status": "0",
+      "weight": "0",
+      "hits": "0",
+      "transcoded": "0",
+      "created_at": "2026-01-29 01:26:14",
+      "modified_at": "2026-01-29 01:28:11",
+      "published_at": null,
+      "normalized_tags": "||",
+      "ceo_id": "73626",
+      "ssts_id": null,
+      "ssts_path": null,
+      "metadata": [
+        {
+          "label": "author_ordered",
+          "value": "[]"
+        }
+      ],
+      "authors": []
+    }
+#+end_example
+
+Note that in this example the "type" is "image" -- we will need to do
+research to see if there are other types of DominantMedia.  For now,
+filter on type and only process images.
+
+Note also the "content" property: it contains a caption (<h5>View of
+campus from the third floor of Marquand Library. </h5>) and a credit line
+(<h6>Leela Hensler / The Daily Princetonian</h6>).  This content
+should be transformed into semantic divs (<div class="caption"> and
+<div class="credit">, and the CSS stylesheet should be modified to
+handle them.
+** TODO [#C] Research: what are the forms of Dominant Media for articles?
+:PROPERTIES:
+:CUSTOM_ID: what-are-types-of-dominant-media
+:ASSIGNEES: Claude, Cliff
+:END:
+A small sampling shows one format -- "type":"image" -- but there may
+be others.
+
+Download a sampling of CEO records and gather values from the
+dominantMedia["type"] property; put these in a report called
+"dominant-media-types.org".

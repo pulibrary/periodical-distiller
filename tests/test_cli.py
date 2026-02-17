@@ -271,6 +271,104 @@ class TestCLITransformALTO:
         assert "Failed to transform SIP to ALTO" in caplog.text
 
 
+class TestCLITransformMODS:
+    """Tests for the transform-mods command."""
+
+    def test_transform_mods_requires_sip_argument(self, capsys):
+        """transform-mods fails without --sip argument."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["transform-mods"])
+        assert exc_info.value.code != 0
+
+    def test_transform_mods_missing_sip_directory(self, tmp_path, caplog):
+        """transform-mods returns error when SIP directory does not exist."""
+        result = main(["transform-mods", "--sip", str(tmp_path / "nonexistent")])
+        assert result == 1
+        assert "SIP directory not found" in caplog.text
+
+    def test_transform_mods_missing_manifest(self, tmp_path, caplog):
+        """transform-mods returns error when SIP manifest is missing."""
+        sip_dir = tmp_path / "sip"
+        sip_dir.mkdir()
+
+        result = main(["transform-mods", "--sip", str(sip_dir)])
+        assert result == 1
+        assert "SIP manifest not found" in caplog.text
+
+    @patch("periodical_distiller.cli.MODSTransformer")
+    def test_transform_mods_success(self, mock_transformer_class, tmp_path):
+        """transform-mods returns 0 on success."""
+        from schemas.sip import SIPArticle, SIPManifest
+
+        sip_dir = tmp_path / "sip"
+        sip_dir.mkdir()
+        manifest = SIPManifest(
+            id="2026-01-29",
+            pip_id="2026-01-29",
+            articles=[
+                SIPArticle(
+                    ceo_id="12345",
+                    mods_path="articles/12345/article.mods.xml",
+                )
+            ],
+        )
+        (sip_dir / "sip-manifest.json").write_text(manifest.model_dump_json(indent=2))
+
+        mock_transformer = MagicMock()
+        mock_transformer.transform.return_value = manifest
+        mock_transformer_class.return_value = mock_transformer
+
+        result = main(["transform-mods", "--sip", str(sip_dir)])
+
+        assert result == 0
+        mock_transformer.transform.assert_called_once_with(sip_dir.resolve())
+
+    @patch("periodical_distiller.cli.MODSTransformer")
+    def test_transform_mods_reports_validation_errors(
+        self, mock_transformer_class, tmp_path, caplog
+    ):
+        """transform-mods logs validation errors from the manifest."""
+        from schemas.sip import SIPManifest
+
+        sip_dir = tmp_path / "sip"
+        sip_dir.mkdir()
+        manifest = SIPManifest(
+            id="2026-01-29",
+            pip_id="2026-01-29",
+            validation_errors=["MODS generation failed for 12345: file not found"],
+        )
+        (sip_dir / "sip-manifest.json").write_text(manifest.model_dump_json(indent=2))
+
+        mock_transformer = MagicMock()
+        mock_transformer.transform.return_value = manifest
+        mock_transformer_class.return_value = mock_transformer
+
+        result = main(["transform-mods", "--sip", str(sip_dir)])
+
+        assert result == 0
+        assert "MODS generation failed for 12345" in caplog.text
+
+    @patch("periodical_distiller.cli.MODSTransformer")
+    def test_transform_mods_handles_exception(
+        self, mock_transformer_class, tmp_path, caplog
+    ):
+        """transform-mods returns error code on unexpected exception."""
+        sip_dir = tmp_path / "sip"
+        sip_dir.mkdir()
+        from schemas.sip import SIPManifest
+        manifest = SIPManifest(id="x", pip_id="x")
+        (sip_dir / "sip-manifest.json").write_text(manifest.model_dump_json(indent=2))
+
+        mock_transformer = MagicMock()
+        mock_transformer.transform.side_effect = Exception("unexpected error")
+        mock_transformer_class.return_value = mock_transformer
+
+        result = main(["transform-mods", "--sip", str(sip_dir)])
+
+        assert result == 1
+        assert "Failed to transform SIP to MODS" in caplog.text
+
+
 class TestCLIMain:
     """Tests for CLI main entry point."""
 

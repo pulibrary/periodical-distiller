@@ -8,7 +8,7 @@ from pathlib import Path
 
 from periodical_distiller.aggregators import PIPAggregator
 from periodical_distiller.clients import CeoClient
-from periodical_distiller.transformers import ALTOTransformer, HTMLTransformer, PDFTransformer
+from periodical_distiller.transformers import ALTOTransformer, HTMLTransformer, MODSTransformer, PDFTransformer
 
 DEFAULT_OUTPUT_DIR = Path("./workspace/pips")
 DEFAULT_SIP_OUTPUT_DIR = Path("./workspace/sips")
@@ -212,6 +212,49 @@ def transform_alto(args: argparse.Namespace) -> int:
         return 1
 
 
+def transform_mods(args: argparse.Namespace) -> int:
+    """Execute the transform-mods command.
+
+    Args:
+        args: Parsed command-line arguments
+
+    Returns:
+        Exit code (0 for success, non-zero for errors)
+    """
+    setup_logging(args.verbose)
+    logger = logging.getLogger(__name__)
+
+    sip_path = args.sip.resolve()
+    if not sip_path.exists():
+        logger.error(f"SIP directory not found: {sip_path}")
+        return 1
+
+    manifest_path = sip_path / "sip-manifest.json"
+    if not manifest_path.exists():
+        logger.error(f"SIP manifest not found: {manifest_path}")
+        return 1
+
+    try:
+        transformer = MODSTransformer()
+        manifest = transformer.transform(sip_path)
+
+        mods_count = sum(1 for a in manifest.articles if a.mods_path)
+        logger.info(f"Transformed SIP: {manifest.id}")
+        logger.info(f"  MODS files generated: {mods_count}")
+        logger.info(f"  Output: {sip_path}")
+
+        if manifest.validation_errors:
+            logger.warning(f"  Errors: {len(manifest.validation_errors)}")
+            for error in manifest.validation_errors:
+                logger.warning(f"    - {error}")
+
+        return 0
+
+    except Exception as e:
+        logger.error(f"Failed to transform SIP to MODS: {e}")
+        return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     """Main entry point for the CLI.
 
@@ -320,6 +363,19 @@ def main(argv: list[str] | None = None) -> int:
         help="Path to the SIP directory containing PDF files",
     )
     alto_parser.set_defaults(func=transform_alto)
+
+    mods_parser = subparsers.add_parser(
+        "transform-mods",
+        help="Generate MODS XML files from CEO3 records in a SIP",
+        description="Read CEO3 source records from the linked PIP and write MODS 3.8 XML files into a Submission Information Package (SIP).",
+    )
+    mods_parser.add_argument(
+        "--sip",
+        type=Path,
+        required=True,
+        help="Path to the SIP directory",
+    )
+    mods_parser.set_defaults(func=transform_mods)
 
     args = parser.parse_args(argv)
 

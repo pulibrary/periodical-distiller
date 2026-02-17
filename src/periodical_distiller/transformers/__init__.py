@@ -2,6 +2,7 @@
 
 from .alto_transformer import ALTOTransformer
 from .html_transformer import HTMLTransformer
+from .image_transformer import ImageTransformer
 from .mods_transformer import MODSTransformer
 from .pdf_transformer import PDFTransformer
 from .transformer import PIPTransformer, SIPTransformer, Transformer
@@ -14,4 +15,5 @@ __all__ = [
     "PDFTransformer",
     "ALTOTransformer",
     "MODSTransformer",
+    "ImageTransformer",
 ]

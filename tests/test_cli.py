@@ -369,6 +369,207 @@ class TestCLITransformMODS:
         assert "Failed to transform SIP to MODS" in caplog.text
 
 
+class TestCLITransformImage:
+    """Tests for the transform-image command."""
+
+    def test_transform_image_requires_sip_argument(self, capsys):
+        """transform-image fails without --sip argument."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["transform-image"])
+        assert exc_info.value.code != 0
+
+    def test_transform_image_missing_sip_directory(self, tmp_path, caplog):
+        """transform-image returns error when SIP directory does not exist."""
+        result = main(["transform-image", "--sip", str(tmp_path / "nonexistent")])
+        assert result == 1
+        assert "SIP directory not found" in caplog.text
+
+    def test_transform_image_missing_manifest(self, tmp_path, caplog):
+        """transform-image returns error when SIP manifest is missing."""
+        sip_dir = tmp_path / "sip"
+        sip_dir.mkdir()
+
+        result = main(["transform-image", "--sip", str(sip_dir)])
+        assert result == 1
+        assert "SIP manifest not found" in caplog.text
+
+    @patch("periodical_distiller.cli.ImageTransformer")
+    def test_transform_image_success(self, mock_transformer_class, tmp_path):
+        """transform-image returns 0 on success."""
+        from schemas.sip import SIPArticle, SIPManifest, SIPPage
+
+        sip_dir = tmp_path / "sip"
+        sip_dir.mkdir()
+        manifest = SIPManifest(
+            id="2026-01-29",
+            pip_id="2026-01-29",
+            articles=[
+                SIPArticle(
+                    ceo_id="12345",
+                    pdf_path="articles/12345/article.pdf",
+                    pages=[
+                        SIPPage(
+                            page_number=1,
+                            alto_path="articles/12345/001.alto.xml",
+                            image_path="articles/12345/001.jpg",
+                        )
+                    ],
+                )
+            ],
+        )
+        (sip_dir / "sip-manifest.json").write_text(manifest.model_dump_json(indent=2))
+
+        mock_transformer = MagicMock()
+        mock_transformer.transform.return_value = manifest
+        mock_transformer_class.return_value = mock_transformer
+
+        result = main(["transform-image", "--sip", str(sip_dir)])
+
+        assert result == 0
+        mock_transformer.transform.assert_called_once_with(sip_dir.resolve())
+
+    @patch("periodical_distiller.cli.ImageTransformer")
+    def test_transform_image_reports_validation_errors(
+        self, mock_transformer_class, tmp_path, caplog
+    ):
+        """transform-image logs validation errors from the manifest."""
+        from schemas.sip import SIPManifest
+
+        sip_dir = tmp_path / "sip"
+        sip_dir.mkdir()
+        manifest = SIPManifest(
+            id="2026-01-29",
+            pip_id="2026-01-29",
+            validation_errors=["Image generation failed for 12345: file not found"],
+        )
+        (sip_dir / "sip-manifest.json").write_text(manifest.model_dump_json(indent=2))
+
+        mock_transformer = MagicMock()
+        mock_transformer.transform.return_value = manifest
+        mock_transformer_class.return_value = mock_transformer
+
+        result = main(["transform-image", "--sip", str(sip_dir)])
+
+        assert result == 0
+        assert "Image generation failed for 12345" in caplog.text
+
+    @patch("periodical_distiller.cli.ImageTransformer")
+    def test_transform_image_handles_exception(
+        self, mock_transformer_class, tmp_path, caplog
+    ):
+        """transform-image returns error code on unexpected exception."""
+        sip_dir = tmp_path / "sip"
+        sip_dir.mkdir()
+        from schemas.sip import SIPManifest
+        manifest = SIPManifest(id="x", pip_id="x")
+        (sip_dir / "sip-manifest.json").write_text(manifest.model_dump_json(indent=2))
+
+        mock_transformer = MagicMock()
+        mock_transformer.transform.side_effect = Exception("unexpected error")
+        mock_transformer_class.return_value = mock_transformer
+
+        result = main(["transform-image", "--sip", str(sip_dir)])
+
+        assert result == 1
+        assert "Failed to transform SIP to images" in caplog.text
+
+
+class TestCLICompileSIP:
+    """Tests for the compile-sip command."""
+
+    def test_compile_sip_requires_sip_argument(self, capsys):
+        """compile-sip fails without --sip argument."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["compile-sip"])
+        assert exc_info.value.code != 0
+
+    def test_compile_sip_missing_sip_directory(self, tmp_path, caplog):
+        """compile-sip returns error when SIP directory does not exist."""
+        result = main(["compile-sip", "--sip", str(tmp_path / "nonexistent")])
+        assert result == 1
+        assert "SIP directory not found" in caplog.text
+
+    def test_compile_sip_missing_manifest(self, tmp_path, caplog):
+        """compile-sip returns error when SIP manifest is missing."""
+        sip_dir = tmp_path / "sip"
+        sip_dir.mkdir()
+
+        result = main(["compile-sip", "--sip", str(sip_dir)])
+        assert result == 1
+        assert "SIP manifest not found" in caplog.text
+
+    @patch("periodical_distiller.cli.VeridianSIPCompiler")
+    def test_compile_sip_success(self, mock_compiler_class, tmp_path):
+        """compile-sip returns 0 on success."""
+        from schemas.sip import SIPManifest
+
+        sip_dir = tmp_path / "sip"
+        sip_dir.mkdir()
+        manifest = SIPManifest(
+            id="2026-01-29",
+            pip_id="2026-01-29",
+            mets_path="mets.xml",
+            status="sealed",
+        )
+        (sip_dir / "sip-manifest.json").write_text(manifest.model_dump_json(indent=2))
+
+        mock_compiler = MagicMock()
+        mock_compiler.compile.return_value = manifest
+        mock_compiler_class.return_value = mock_compiler
+
+        result = main(["compile-sip", "--sip", str(sip_dir)])
+
+        assert result == 0
+        mock_compiler.compile.assert_called_once_with(sip_dir.resolve())
+
+    @patch("periodical_distiller.cli.VeridianSIPCompiler")
+    def test_compile_sip_reports_validation_errors(
+        self, mock_compiler_class, tmp_path, caplog
+    ):
+        """compile-sip logs validation errors from the manifest."""
+        from schemas.sip import SIPManifest
+
+        sip_dir = tmp_path / "sip"
+        sip_dir.mkdir()
+        manifest = SIPManifest(
+            id="2026-01-29",
+            pip_id="2026-01-29",
+            mets_path="mets.xml",
+            status="sealed",
+            validation_errors=["METS build error: missing file"],
+        )
+        (sip_dir / "sip-manifest.json").write_text(manifest.model_dump_json(indent=2))
+
+        mock_compiler = MagicMock()
+        mock_compiler.compile.return_value = manifest
+        mock_compiler_class.return_value = mock_compiler
+
+        result = main(["compile-sip", "--sip", str(sip_dir)])
+
+        assert result == 0
+        assert "METS build error: missing file" in caplog.text
+
+    @patch("periodical_distiller.cli.VeridianSIPCompiler")
+    def test_compile_sip_handles_exception(
+        self, mock_compiler_class, tmp_path, caplog
+    ):
+        """compile-sip returns error code on unexpected exception."""
+        sip_dir = tmp_path / "sip"
+        sip_dir.mkdir()
+        from schemas.sip import SIPManifest
+        manifest = SIPManifest(id="x", pip_id="x")
+        (sip_dir / "sip-manifest.json").write_text(manifest.model_dump_json(indent=2))
+
+        mock_compiler = MagicMock()
+        mock_compiler.compile.side_effect = Exception("unexpected error")
+        mock_compiler_class.return_value = mock_compiler
+
+        result = main(["compile-sip", "--sip", str(sip_dir)])
+
+        assert result == 1
+        assert "Failed to compile SIP" in caplog.text
+
+
 class TestCLIMain:
     """Tests for CLI main entry point."""
 

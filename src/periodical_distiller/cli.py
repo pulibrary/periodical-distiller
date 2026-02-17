@@ -8,7 +8,8 @@ from pathlib import Path
 
 from periodical_distiller.aggregators import PIPAggregator
 from periodical_distiller.clients import CeoClient
-from periodical_distiller.transformers import ALTOTransformer, HTMLTransformer, MODSTransformer, PDFTransformer
+from periodical_distiller.compilers import VeridianSIPCompiler
+from periodical_distiller.transformers import ALTOTransformer, HTMLTransformer, ImageTransformer, MODSTransformer, PDFTransformer
 
 DEFAULT_OUTPUT_DIR = Path("./workspace/pips")
 DEFAULT_SIP_OUTPUT_DIR = Path("./workspace/sips")
@@ -255,6 +256,95 @@ def transform_mods(args: argparse.Namespace) -> int:
         return 1
 
 
+def transform_image(args: argparse.Namespace) -> int:
+    """Execute the transform-image command.
+
+    Args:
+        args: Parsed command-line arguments
+
+    Returns:
+        Exit code (0 for success, non-zero for errors)
+    """
+    setup_logging(args.verbose)
+    logger = logging.getLogger(__name__)
+
+    sip_path = args.sip.resolve()
+    if not sip_path.exists():
+        logger.error(f"SIP directory not found: {sip_path}")
+        return 1
+
+    manifest_path = sip_path / "sip-manifest.json"
+    if not manifest_path.exists():
+        logger.error(f"SIP manifest not found: {manifest_path}")
+        return 1
+
+    try:
+        transformer = ImageTransformer()
+        manifest = transformer.transform(sip_path)
+
+        image_count = sum(
+            sum(1 for p in a.pages if p.image_path)
+            for a in manifest.articles
+        )
+        logger.info(f"Transformed SIP: {manifest.id}")
+        logger.info(f"  Images generated: {image_count}")
+        logger.info(f"  Output: {sip_path}")
+
+        if manifest.validation_errors:
+            logger.warning(f"  Errors: {len(manifest.validation_errors)}")
+            for error in manifest.validation_errors:
+                logger.warning(f"    - {error}")
+
+        return 0
+
+    except Exception as e:
+        logger.error(f"Failed to transform SIP to images: {e}")
+        return 1
+
+
+def compile_sip(args: argparse.Namespace) -> int:
+    """Execute the compile-sip command.
+
+    Args:
+        args: Parsed command-line arguments
+
+    Returns:
+        Exit code (0 for success, non-zero for errors)
+    """
+    setup_logging(args.verbose)
+    logger = logging.getLogger(__name__)
+
+    sip_path = args.sip.resolve()
+    if not sip_path.exists():
+        logger.error(f"SIP directory not found: {sip_path}")
+        return 1
+
+    manifest_path = sip_path / "sip-manifest.json"
+    if not manifest_path.exists():
+        logger.error(f"SIP manifest not found: {manifest_path}")
+        return 1
+
+    try:
+        compiler = VeridianSIPCompiler()
+        manifest = compiler.compile(sip_path)
+
+        logger.info(f"Compiled SIP: {manifest.id}")
+        logger.info(f"  METS: {manifest.mets_path}")
+        logger.info(f"  Status: {manifest.status}")
+        logger.info(f"  Output: {sip_path}")
+
+        if manifest.validation_errors:
+            logger.warning(f"  Errors: {len(manifest.validation_errors)}")
+            for error in manifest.validation_errors:
+                logger.warning(f"    - {error}")
+
+        return 0
+
+    except Exception as e:
+        logger.error(f"Failed to compile SIP: {e}")
+        return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     """Main entry point for the CLI.
 
@@ -376,6 +466,32 @@ def main(argv: list[str] | None = None) -> int:
         help="Path to the SIP directory",
     )
     mods_parser.set_defaults(func=transform_mods)
+
+    image_parser = subparsers.add_parser(
+        "transform-image",
+        help="Generate JPEG page images from PDFs in a SIP",
+        description="Rasterize PDF articles in a Submission Information Package (SIP) to JPEG images at 150 DPI.",
+    )
+    image_parser.add_argument(
+        "--sip",
+        type=Path,
+        required=True,
+        help="Path to the SIP directory containing PDF files",
+    )
+    image_parser.set_defaults(func=transform_image)
+
+    compile_parser = subparsers.add_parser(
+        "compile-sip",
+        help="Compile METS and seal a SIP for Veridian ingest",
+        description="Build a METS document from SIP and PIP manifests and seal the Submission Information Package for Veridian ingest.",
+    )
+    compile_parser.add_argument(
+        "--sip",
+        type=Path,
+        required=True,
+        help="Path to the SIP directory",
+    )
+    compile_parser.set_defaults(func=compile_sip)
 
     args = parser.parse_args(argv)
 

@@ -1,5 +1,6 @@
 """Transformers for converting data between formats."""
 
+from .alto_transformer import ALTOTransformer
 from .html_transformer import HTMLTransformer
 from .pdf_transformer import PDFTransformer
 from .transformer import PIPTransformer, SIPTransformer, Transformer
@@ -10,4 +11,5 @@ __all__ = [
     "Transformer",  # Backwards compatibility alias for PIPTransformer
     "HTMLTransformer",
     "PDFTransformer",
+    "ALTOTransformer",
 ]

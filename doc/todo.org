@@ -1,6 +1,861 @@
 # -*- lexical-binding: t; -*-
 #+TITLE: TODOs for Princeton Distiller
 
+* Code Review — 2026-02-19
+Items surfaced by a full module-by-module review before the next phase of work.
+Priorities: [#A] = fix before adding features, [#B] = fix soon, [#C] = eventually.
+
+** Schemas
+
+*** DONE [#B] ~ConnectionError~ in exceptions.py shadows Python builtin
+:PROPERTIES:
+:CUSTOM_ID: review/exceptions-shadows-builtin
+:DISPOSITION: fix now
+:END:
+~from .exceptions import ConnectionError~ in ~client.py~ shadows the Python builtin
+~ConnectionError~.  This is low-risk now but could cause subtle bugs if builtin
+exception handling ever needs to co-exist.
+
+- Suggested action :: Rename to ~NetworkConnectionError~ or ~ClientConnectionError~.
+
+**** Notes
+The shadow is real and confirmed: ~clients/exceptions.py~ line 12 defines
+~class ConnectionError(ClientError)~, and ~client.py~ imports it with
+~from .exceptions import ConnectionError~.  The builtin ~ConnectionError~
+(a subclass of ~OSError~) is commonly caught by generic library and stdlib
+code, so any caller that does ~except ConnectionError:~ expecting the
+builtin will instead catch the custom one if the import is in scope.
+
+The rename is mechanical — find/replace the class name and all ~raise~
+sites — and carries no design tradeoff.
+
+Open questions:
+- Preferred name: ~ClientConnectionError~ (matches the ~ClientError~ base)
+  or ~NetworkConnectionError~ (emphasises the failure category)?
+
+Recommended disposition: Fix now
+
+**** Response
+I prefer ~ClientConnectionError~ because it makes it easier to see what module to investigate.
+
+*** DONE [#C] ~PreservationDescriptionInfo.harvest_timestamp~ uses local time
+:PROPERTIES:
+:CUSTOM_ID: review/pdi-harvest-timestamp-timezone
+:DISPOSITION: fix now
+:END:
+~harvest_timestamp: datetime = Field(default_factory=datetime.now)~ captures local
+wall-clock time without timezone info.  OAIS preservation metadata should record
+UTC timestamps.
+
+- Suggested action :: Change to ~Field(default_factory=lambda: datetime.now(timezone.utc))~
+  and import ~timezone~ from ~datetime~.
+
+**** Notes
+Confirmed in ~pip.py~ line 71.  The fix is one line plus one import.  The
+timestamp is recorded for human provenance, not for datetime arithmetic, so
+there is no risk of breaking downstream comparisons — but a naive local
+timestamp in an archival record is quietly wrong for anyone in a non-UTC
+timezone or when the server clock is ambiguous (e.g., DST transitions).
+
+One optional follow-up: add a Pydantic validator that rejects a naive
+(timezone-unaware) ~datetime~ if the field is ever set explicitly by a
+caller rather than via the default factory.  This would be an extra guard,
+not a requirement for the immediate fix.
+
+Open questions:
+- Do we want the optional validator, or is the factory change sufficient?
+
+Recommended disposition: Fix now
+
+**** Response
+Make the immediate fix now, and add a level [#C] Todo to add the
+Pydantic validator later.
+
+*** TODO [#C] Add Pydantic validator rejecting naive ~harvest_timestamp~
+:PROPERTIES:
+:CUSTOM_ID: review/pdi-harvest-timestamp-validator
+:END:
+Follow-up to ~review/pdi-harvest-timestamp-timezone~.  After the default
+factory is fixed to emit UTC-aware datetimes, add a ~field_validator~ on
+~PreservationDescriptionInfo.harvest_timestamp~ that raises ~ValueError~ if a
+caller passes a naive (timezone-unaware) ~datetime~ directly.
+
+*** DONE [#C] Domain objects in ~src/schemas/~ may be dead code
+:PROPERTIES:
+:CUSTOM_ID: review/dead-domain-objects
+:DISPOSITION: document
+:END:
+~article.py~, ~issue.py~, and ~page.py~ define dataclass domain objects (~Article~,
+~Issue~, ~Page~).  The actual transformer pipeline works directly with Pydantic
+schemas (~SIPArticle~, ~SIPPage~) and never instantiates these dataclasses.
+
+- Suggested action :: Confirm nothing uses them, then either remove or explicitly
+  document their intended future role (e.g., "used when generalising beyond CEO3").
+
+**** Notes
+Confirmed: ~src/schemas/__init__.py~ exports ~Article~, ~Issue~, ~Page~
+(from ~article.py~, ~issue.py~, ~page.py~), but a project-wide grep finds
+no imports of these names outside the ~src/schemas/~ directory itself.
+The active pipeline uses ~SIPArticle~ / ~SIPPage~ (Pydantic, in ~sip.py~)
+and ~ArticleTokenContent~ / ~IssueTokenContent~ (Pydantic token schemas).
+The dataclass domain objects predate the Pydantic-based design and were
+never wired into any transformer or compiler.
+
+The CLAUDE.md mentions "Project Strawberry" (generalising beyond CEO3) as a
+secondary goal, so there is a plausible future use — but the objects as
+written are CEO3-agnostic dataclasses with no behaviour, which makes them
+easy to recreate if ever needed.
+
+Open questions:
+- Are these objects part of a planned future design, or are they genuine
+  leftovers?  If the former, a one-line docstring ("Reserved for Project
+  Strawberry; not yet used.") is sufficient documentation.  If the latter,
+  delete them.
+
+Recommended disposition: Remove (if no future design intent) or document
+(if intentionally reserved) — your call
+
+**** Response
+Project Strawberry is a larger-scale project to process periodicals
+into SIPs; the domain categories come from there. Add the docstring.
+
+*** DONE [#C] ~IssueTokenContent.articles~ is untyped ~list[dict]~
+:PROPERTIES:
+:CUSTOM_ID: review/issue-token-articles-untyped
+:DISPOSITION: fix now
+:END:
+~articles: list[dict] = []~ carries no schema guarantee.  Consider using
+~list[ArticleTokenContent]~ for type safety across pipeline stages.
+
+**** Notes
+Confirmed in ~src/schemas/tokens/issue_token.py~ line 30.
+~ArticleTokenContent~ already exists in ~schemas/tokens/article_token.py~
+and is the natural type for this field (its docstring says "Completed
+article data gathered from article pipeline").
+
+A grep finds no code currently writing to ~IssueTokenContent.articles~
+(the issue-assembly pipeline that would populate it has not been built yet),
+so this is a safe annotation-only change with no runtime impact today.
+Pydantic will coerce a plain dict into an ~ArticleTokenContent~ instance at
+validation time, which is the desired behaviour for future consumers.
+
+Open questions:
+- None — the intended type is unambiguous.
+
+Recommended disposition: Fix now
+
+** Clients
+
+*** DONE [#B] ~_parse_published_date~ returning ~date.min~ can cause early pagination stop
+:PROPERTIES:
+:CUSTOM_ID: review/ceo-client-date-min-bug
+:DISPOSITION: fix now
+:END:
+When an article has ~published_at = None~ or an unparseable timestamp,
+~_parse_published_date~ returns ~date.min~.  In the ~fetch~ loop, ~date.min < date_start~
+is always true, so ~reached_older_articles = True~ fires immediately, silently
+truncating the result set.
+
+- Suggested action :: Skip (continue) articles with ~pub_date == date.min~ rather
+  than treating them as "older than start date".  Log a warning with the article ID.
+
+**** Notes
+Confirmed bug.  In ~ceo_client.py~ lines 74–82: the loop calls
+~_parse_published_date~ (which returns ~date.min~ for ~None~ or unparseable
+values, lines 106 and 111), then immediately evaluates
+~if date_start is not None and pub_date < date_start~ — which is always
+~True~ for ~date.min~, so it sets ~reached_older_articles = True~ and ~break~s.
+
+The consequence: a single article with a missing or malformed ~published_at~
+that appears anywhere before the target-date articles on a page will silently
+truncate the result, with no warning logged.
+
+The fix is minimal: before the date-range checks, insert:
+#+begin_example
+if pub_date == date.min:
+    logger.warning("Skipping article %s: unparseable published_at", article.get("id"))
+    continue
+#+end_example
+The companion test gap (see ~review/test-gap-ceo-client-date~) should be fixed
+in the same PR.
+
+Open questions:
+- None — fix and test together.
+
+Recommended disposition: Fix now
+
+*** TODO [#C] No retry on transient 5xx responses
+:PROPERTIES:
+:CUSTOM_ID: review/client-no-5xx-retry
+:DISPOSITION: defer
+:END:
+~Client._request~ only retries on ~httpx.ConnectError~ and ~httpx.TimeoutException~.
+A 503 Service Unavailable (which is transient) causes an ~APIError~ with no retry.
+
+- Suggested action :: Optionally retry on 5xx status codes (configurable via config key
+  ~retry_on_server_errors: true~).  Also consider exponential backoff instead of flat
+  ~sleep(retry_delay)~.
+
+**** Notes
+Confirmed in ~client.py~ lines 136–153.  The retry loop catches
+~httpx.ConnectError~ and ~httpx.TimeoutException~ only.  An ~APIError~ (raised
+by ~_handle_response~ for any non-2xx) propagates immediately without retry —
+so a transient 503 fails on the first attempt.
+
+Two separable improvements are bundled in the suggested action:
+
+1. *Retry on 5xx*: catch ~APIError~ inside the loop when
+   ~e.status_code >= 500~.  No config flag is strictly necessary — 5xx is
+   always transient by definition; a simpler default-on behaviour is fine.
+   (A config flag only makes sense if callers need to disable it for
+   idempotency reasons, which don't apply here since all requests are GETs.)
+
+2. *Exponential backoff*: replace ~sleep(self.retry_delay)~ with
+   ~sleep(self.retry_delay * 2 ** attempt)~.  Strictly an enhancement, not
+   a bug fix; could be a separate PR.
+
+Open questions:
+- Do you want both changes together, or just the 5xx retry for now?
+- Config flag for 5xx retry, or always-on?
+
+Recommended disposition: Defer (nice-to-have; the pipeline currently runs
+in batch mode where a single 503 would be re-run manually anyway)
+
+** Aggregators
+:PROPERTIES:
+:DISPOSITION: remove the method
+:END:
+
+*** TODO [#B] ~MediaDownloader~ created by ~PIPAggregator~ is never closed
+:PROPERTIES:
+:CUSTOM_ID: review/media-downloader-resource-leak
+:DISPOSITION: fix now
+:END:
+When ~download_media=True~ and no ~media_downloader~ is injected, ~_get_media_downloader~
+creates a ~MediaDownloader~ internally.  The downloader (and its internal ~httpx.Client~)
+is never closed — ~MediaDownloader.close()~ and ~__exit__~ are defined but never called
+by ~PIPAggregator~.
+
+- Suggested action :: Either make ~PIPAggregator~ a context manager that closes the
+  downloader in ~__exit__~, or call ~downloader.close()~ at the end of ~create_pip~.
+
+**** Notes
+Confirmed.  ~pip_aggregator.py~ line 48 records ~self._owns_downloader~ (a
+flag indicating whether ~PIPAggregator~ created the downloader internally),
+but the flag is never consulted again — there is no ~__exit__~ or explicit
+~close()~ call.  The internal ~httpx.Client~ inside the downloader therefore
+leaks its connection pool for the lifetime of the process.
+
+Between the two suggested fixes, the context-manager approach is cleaner:
+
+#+begin_example
+def __enter__(self): return self
+
+def __exit__(self, exc_type, exc_val, exc_tb):
+    if self._owns_downloader and self._media_downloader is not None:
+        self._media_downloader.close()
+    return False
+#+end_example
+
+This mirrors how ~CeoClient~ already works and leaves the existing
+~_owns_downloader~ flag useful.  The CLI call sites would need to wrap
+~PIPAggregator~ in a ~with~ block the same way they wrap ~CeoClient~.
+
+Calling ~downloader.close()~ inside ~create_pip~ is simpler but would
+close and re-create the connection pool on every call if
+~create_pip~ is invoked multiple times — that's fine for current usage
+but slightly inefficient.
+
+Side-note: ~pip_aggregator.py~ line 102 also calls ~datetime.now()~ (naive
+local time) when constructing ~PreservationDescriptionInfo~.  The fix for
+~review/pdi-harvest-timestamp-timezone~ must cover this call site too, not
+only the Pydantic default factory.
+
+Open questions:
+- Context-manager approach (preferred) or close-in-~create_pip~?
+
+Recommended disposition: Fix now
+**** Response
+Use the Context-manager approach.
+
+*** TODO [#C] ~MediaDownloader._build_media_url~ (singular) is dead code
+:PROPERTIES:
+:CUSTOM_ID: review/media-downloader-dead-method
+:END:
+~_build_media_url~ at line ~300~ simply delegates to ~_build_media_urls()[0]~.  It is
+not called anywhere.
+
+- Suggested action :: Remove the method.
+
+**** Notes
+Confirmed.  ~_build_media_url~ (line 300–309) is only three lines: it
+delegates entirely to ~_build_media_urls(media)[0]~.  A project-wide
+search finds no call sites outside the class itself.  The plural
+~_build_media_urls~ already exists and is called directly by
+~_download_dominant_media~, so the singular wrapper serves no purpose.
+
+Deletion is safe and unambiguous.
+
+Open questions:
+- None.
+
+Recommended disposition: Fix now
+
+** Transformers
+:PROPERTIES:
+:DISPOSITION: fix now
+:END:
+
+*** TODO [#B] ~PACKAGE_ROOT~ computed via four ~.parent~ calls — fragile
+:PROPERTIES:
+:CUSTOM_ID: review/package-root-fragile
+:DISPOSITION: add comment
+:END:
+~PACKAGE_ROOT = Path(__file__).parent.parent.parent.parent~ in ~html_transformer.py~
+and ~pdf_transformer.py~ silently breaks if the file is ever moved.
+
+- Suggested action :: Use ~importlib.resources~ or anchor to the package root via
+  ~importlib.metadata~ / an installed data file.  Alternatively, document the
+  assumed directory depth with a comment explaining the path.
+
+**** Notes
+Confirmed in ~html_transformer.py~ line 25 and ~pdf_transformer.py~.  The
+chain resolves as:
+
+#+begin_example
+html_transformer.py
+  → transformers/
+  → periodical_distiller/
+  → src/
+  → {project root}        ← PACKAGE_ROOT
+#+end_example
+
+So ~resources/templates~ and ~resources/stylesheets~ are located at the
+project root.  This is correct for the current layout, but silently wrong
+if the file moves one directory up or down.
+
+Three approaches, in order of increasing robustness:
+
+1. *Add a comment* explaining the depth — zero code change, just
+   documents the assumption.  Lowest friction.
+
+2. *Use ~importlib.resources~* — but this requires moving ~resources/~
+   inside the installed package (to
+   ~src/periodical_distiller/resources/~) and declaring it as package
+   data in ~pyproject.toml~.  That's the "right" answer for a
+   distributed library.
+
+3. *Keep constructor injection only* — the constructor already accepts
+   ~templates_dir~ and ~stylesheets_dir~ overrides.  Remove the
+   module-level ~PACKAGE_ROOT~ constant entirely and raise an error
+   if neither defaults are found nor overrides are supplied.
+
+Open questions:
+- Is this codebase ever expected to be installed as a library (option 2),
+  or will it always run from the project checkout (option 1 or 3 is fine)?
+
+Recommended disposition: Fix now (at minimum, add the comment; move
+resources into the package if library distribution is planned)
+**** Response
+I think the codebase could eventually be installed as a library, so
+for now, just add the comment; also create a TODO to make a decision
+on whether to package it as a library or not.
+
+*** TODO [#C] Decide: run-from-checkout vs. installable library
+:PROPERTIES:
+:CUSTOM_ID: review/library-distribution-decision
+:END:
+~PACKAGE_ROOT~ in transformers is anchored via four ~.parent~ calls; the
+comment fix (see ~review/package-root-fragile~) is sufficient for a
+run-from-checkout workflow, but an installable library would require
+moving ~resources/~ inside the package and using ~importlib.resources~.
+
+Make an explicit decision about the distribution model before the
+package grows further.  Options:
+
+1. *Checkout-only* — document the assumption, keep resources at the
+   project root.
+2. *Installable library* — move ~resources/~ to
+   ~src/periodical_distiller/resources/~, declare package data in
+   ~pyproject.toml~, switch to ~importlib.resources~.
+
+*** TODO [#C] Image DPI (150) is below archival standard
+:PROPERTIES:
+:CUSTOM_ID: review/image-dpi-too-low
+:DISPOSITION: make configurable
+:END:
+~ImageTransformer~ rasterises pages at 150 DPI (~fitz.Matrix(150/72, 150/72)~).
+Typical archival standards for text images are 300–400 DPI.
+
+- Suggested action :: Make DPI configurable via constructor parameter (default 150 for
+  speed; caller can pass 300 for archival runs).  Confirm with stakeholders what
+  Veridian requires.
+
+**** Notes
+Confirmed in ~image_transformer.py~ line 96:
+~mat = fitz.Matrix(150 / 72, 150 / 72)  # 150 DPI~.
+
+The DPI question has two distinct sub-questions:
+
+1. *What does Veridian require?*  If Veridian's ingest spec mandates a
+   minimum DPI (some systems require 300 for text), 150 is a correctness
+   bug, not just a quality shortcut.
+
+2. *Should DPI be configurable regardless?*  Making it a constructor
+   parameter (~dpi: int = 150~) is a two-line change and is good practice
+   independent of the Veridian requirement.  It also lets tests run
+   at low DPI for speed without modifying source code.
+
+The two sub-items can be decoupled: make DPI configurable now, and
+verify the Veridian requirement separately.
+
+Open questions:
+- Do you have access to Veridian's ingest documentation to confirm the
+  minimum DPI requirement?
+
+Recommended disposition: Make configurable now ([#B] if Veridian requires
+≥ 300 and we're currently below spec; [#C] otherwise)
+**** Response
+Let's make it configurable for now, and I'll confirm with Veridian.
+
+*** TODO [#C] ~_copy_article_media~ return value is unused
+:PROPERTIES:
+:CUSTOM_ID: review/copy-article-media-return-unused
+:DISPOSITION: fix now
+:END:
+~HTMLTransformer._copy_article_media~ returns ~list[str]~ (copied paths), but the
+caller discards it.  The variable ~copied_media~ is assigned but never read.
+
+- Suggested action :: Either use the return value (e.g., store in the ~SIPArticle~) or
+  change the return type to ~None~ to reduce confusion.
+
+**** Notes
+Confirmed in ~html_transformer.py~ lines 165–167:
+
+#+begin_example
+copied_media = self._copy_article_media(
+    pip_path, pip_article, article_dir, images_dir, charts_dir
+)
+#+end_example
+
+~copied_media~ is assigned but never read.  ~SIPArticle~ has no field for
+copied media paths, so storing the return value would require a schema
+change.
+
+The simpler fix: change the method's return type to ~None~, drop the
+~return copied~ statement, and drop the assignment at the call site.  This
+removes the misleading ~list[str]~ return and makes the side-effect-only
+nature of the method clear.
+
+The alternative (store in ~SIPArticle~) would let us later verify which
+media was successfully copied, but there's no current consumer of that
+information and it would mean adding a field to the schema.
+
+Open questions:
+- None — unless you foresee a future consumer of the copied-paths list.
+
+Recommended disposition: Fix now (change to ~None~ return)
+
+*** TODO [#C] ~_transform_article~ parameter ~pip_article~ is untyped
+:PROPERTIES:
+:CUSTOM_ID: review/html-transformer-untyped-param
+:END:
+~HTMLTransformer._transform_article(self, pip_path, pip_article, sip_path, template)~
+— ~pip_article~ has no type annotation.  Should be ~pip_article: PIPArticle~.
+
+**** Notes
+Confirmed.  There are actually three untyped parameters across two methods
+in ~html_transformer.py~:
+
+- ~_transform_article~ line 138: ~pip_article~ (should be ~PIPArticle~)
+- ~_transform_article~ line 139: ~template~ (should be ~jinja2.Template~)
+- ~_copy_article_media~ line 199: ~pip_article~ (should be ~PIPArticle~)
+
+And one in ~image_transformer.py~:
+- ~_transform_article~ line 76: ~article~ (should be ~SIPArticle~)
+
+All are internal private methods, so the risk is low, but the missing
+annotations reduce static analysis coverage.  All four are trivial to fix
+in a single pass.
+
+Open questions:
+- None.
+
+Recommended disposition: Fix now
+
+** Compilers
+
+*** TODO [#B] ~file://./{path}~ in METS FLocat hrefs is non-standard
+:PROPERTIES:
+:CUSTOM_ID: review/mets-file-uri-format
+:DISPOSITION: defer
+:END:
+~METSCompiler~ emits ~file://./{page.image_path}~ for file locations.  The ~file://./~
+form is non-standard; absolute file URIs should use three slashes
+(~file:///abs/path~) or relative paths should omit the scheme entirely.
+
+- Suggested action :: Verify with Veridian documentation what URL format it expects
+  in FLocat/@href.  If relative paths are acceptable, drop the ~file://./~ prefix.
+
+**** Notes
+Confirmed.  ~mets_compiler.py~ emits ~file://./~ in four places (lines 240,
+255, 269, 283 — image, ALTO, PDF, MODS file groups respectively).
+
+~file://./~ is non-standard.  RFC 8089 defines ~file://~ URIs as
+~file://[authority]/path~; the authority is either the hostname or empty
+(meaning localhost).  A dot (~.~) is not a valid authority component, and no
+major resolver treats it as "current directory" — that convention belongs
+to relative URI references, not ~file://~ URIs.
+
+The two conformant alternatives are:
+
+1. *Relative path* — just the path string with no scheme:
+   ~articles/73553/001.jpg~.  Set ~LOCTYPE="OTHER" OTHERLOCTYPE="RELATIVE"~
+   or simply ~LOCTYPE="URL"~ with a relative reference (permitted by
+   the METS schema and common in practice for local packages).
+
+2. *Absolute file URI* — ~file:///absolute/path/to/file~.  Impractical
+   for a package Veridian will receive and unpack elsewhere.
+
+Option 1 is almost certainly what Veridian expects: the ingest system
+unpacks the SIP and resolves all paths relative to the package root.
+Blue Mountain METS packages (the reference model for this project) use
+relative paths without a ~file://~ prefix.
+
+The fix is a find/replace: drop the ~file://./~ prefix from all four
+~FLocat~ construction sites, leaving just the relative path string.
+
+Open questions:
+- Can you confirm with Veridian / check a reference Blue Mountain package
+  that relative hrefs (no scheme) are the expected format?
+
+Recommended disposition: Fix now (high confidence the current form is
+wrong; relative paths are the obvious correct answer — but confirm before
+closing)
+**** Notes
+I'll confirm with Veridian; defer for now.
+
+*** TODO [#C] No ~CHECKSUM~ attributes on METS ~file~ elements
+:PROPERTIES:
+:CUSTOM_ID: review/mets-no-checksums
+:DISPOSITION: defer
+:END:
+METS best practice includes ~CHECKSUM~ and ~CHECKSUMTYPE~ attributes on ~file~
+elements for integrity verification.  The PIP manifest already captures SHA-256
+checksums for downloaded media.
+
+- Suggested action :: Propagate PIP checksums into METS ~file~ elements where
+  available.
+
+**** Notes
+The PIP manifest already carries SHA-256 checksums for downloaded images
+(~PIPMedia.checksum~).  The ~METSCompiler~ loads the PIP manifest (line 55),
+so the data is in scope.
+
+However, checksums are only available for a subset of file types:
+
+| File type | Checksum available? | Source |
+|-----------+---------------------+--------|
+| Images    | Yes                 | ~PIPMedia.checksum~ from imgix download |
+| ALTO      | No                  | Generated file; not checksummed at creation |
+| PDF       | No                  | Generated file; not checksummed at creation |
+| MODS      | No                  | Generated file; not checksummed at creation |
+
+To get complete coverage, generated files would need their SHA-256
+computed at compile time by reading the file off disk — which is
+straightforward but adds I/O.
+
+The implementation would have two parts:
+
+1. *PIP images*: look up ~PIPMedia.checksum~ by matching the image
+   filename in the PIP media list; set ~CHECKSUM~ and
+   ~CHECKSUMTYPE="SHA-256"~ on the ~file~ element.
+
+2. *Generated files* (ALTO, PDF, MODS): compute ~hashlib.sha256()~ on
+   the file bytes at compile time before writing the element.
+
+This is meaningful but not trivial work, and Veridian may not require
+checksums at all for ingest.
+
+Open questions:
+- Does Veridian's ingest spec require ~CHECKSUM~ attributes?  If not,
+  this is polish rather than a correctness fix.
+
+Recommended disposition: Defer pending Veridian spec confirmation
+**** Response
+We're not using METS as preservation format (its original intent), so the
+checksum is probably superfluous.  But I'll confirm with Veridian.
+
+** Pipeline
+
+*** TODO [#B] ~Filter.process_token~ / ~validate_token~ should be ~@abstractmethod~
+:PROPERTIES:
+:CUSTOM_ID: review/filter-not-abstract
+:DISPOSITION: use ABC
+:END:
+~plumbing.Filter~ uses ~raise NotImplementedError~ instead of ABC abstract methods.
+A subclass that omits ~process_token~ will only fail at runtime when a token is
+processed, not at class definition time.
+
+- Suggested action :: Make ~Filter~ inherit from ~ABC~ and decorate ~process_token~ and
+  ~validate_token~ with ~@abstractmethod~.
+
+**** Notes
+Confirmed in ~plumbing.py~ lines 382–408.  ~Filter~ is a plain class; both
+methods raise ~NotImplementedError~ but give no compile-time guarantee.
+
+The risk is concrete: if a new filter subclass is added and its author
+forgets to override ~process_token~, the bug is silent until a token
+actually hits that filter in production.  With ~@abstractmethod~, the
+mistake is caught at the first ~Instantiation~ of the subclass.
+
+The fix is minimal:
+
+#+begin_example
+from abc import ABC, abstractmethod
+
+class Filter(ABC):
+    ...
+    @abstractmethod
+    def process_token(self, token: Token) -> bool: ...
+
+    @abstractmethod
+    def validate_token(self, token: Token) -> bool: ...
+#+end_example
+
+Note: the ~SIPTransformerFilter~ refactor (see ~review/filter-duplication~)
+should happen first (or simultaneously), because once the base class is
+ABC, all four concrete filters would need to still satisfy the abstract
+interface — which they do, but the refactor could make that cleaner.
+
+Open questions:
+- None.
+
+Recommended disposition: Fix now
+**** Response
+The Pipeline code was ported rather bluntly from another
+codebase. Refactoring now is a good idea.
+
+*** TODO [#B] ~Pipe.out_path~ / ~marked_path~ / ~error_path~ guard on wrong variable
+:PROPERTIES:
+:CUSTOM_ID: review/pipe-method-guard-bug
+:DISPOSITION: fix now
+:END:
+~Pipe.out_path(token)~, ~marked_path(token)~, and ~error_path(token)~ check
+~if self.token and self.token.name~ but compute their path from the ~token~ argument.
+The guard should check the argument, not the instance variable.
+
+- Suggested action :: Change guards to ~if token and token.name~ in those methods.
+
+**** Notes
+Confirmed in ~plumbing.py~ lines 126–142.  Compare the three broken
+methods with the one that works correctly:
+
+#+begin_example
+# CORRECT (line 120) — guards on the *argument*
+def in_path(self, token: Token) -> Path:
+    if token is not None and token.name is not None:
+        return self.input / Path(token.name).with_suffix(".json")
+
+# BROKEN (line 126) — guards on self.token, uses token for the path
+def out_path(self, token: Token) -> Path:
+    if self.token and self.token.name:
+        return self.output / Path(token.name).with_suffix(".json")
+#+end_example
+
+~marked_path~ (line 132) and ~error_path~ (line 138) have the same bug.
+
+In practice, ~self.token~ is always set when these methods are called
+(they're only called from ~put_token~ / ~put_token_back~ / ~mark_token~,
+which check ~if self.token:~ first), so the bug is currently latent —
+no wrong result is produced today.  But it's a logical error that could
+bite during refactoring, and the fix is three identical one-line changes.
+
+Open questions:
+- None.
+
+Recommended disposition: Fix now
+
+*** TODO [#C] Individual pipeline filters have significant code duplication
+:PROPERTIES:
+:CUSTOM_ID: review/filter-duplication
+:DISPOSITION: refactor
+:END:
+~PdfFilter~, ~AltoFilter~, ~ModsFilter~, ~ImageFilter~ all follow the identical pattern:
+validate ~sip_path~ exists, call transformer, propagate ~validation_errors~.
+Only the transformer call and the token field differ.
+
+- Suggested action :: Consider a ~SIPTransformerFilter~ base class parameterised by a
+  ~SIPTransformer~ instance that handles the boilerplate, leaving only field-specific
+  logic in subclasses.
+
+*** TODO [#C] ~_find_token~ import inside method body
+:PROPERTIES:
+:CUSTOM_ID: review/orchestrator-inline-import
+:DISPOSITION: remove inline import
+:END:
+~Orchestrator._find_token~ has ~from periodical_distiller.pipeline.plumbing import load_token~
+inside the method body (line 139).  ~load_token~ is already imported at the top of the
+file.
+
+- Suggested action :: Remove the inline import; it's redundant.
+
+** CLI
+
+*** TODO [#B] ~--verbose~ only works before the subcommand name
+:PROPERTIES:
+:CUSTOM_ID: review/cli-verbose-placement
+:DISPOSITION: fix now
+:END:
+~-v~ / ~--verbose~ is defined on the top-level parser only.  It works as
+~cli.py -v transform-pdf --sip ...~ but not as ~cli.py transform-pdf -v --sip ...~
+(the subparser does not define it, so argparse raises "unrecognized argument").
+
+- Suggested action :: Add ~--verbose~ to each subparser, or use ~parents=[verbose_parser]~
+  with a shared parent parser.
+
+**** Notes
+Confirmed.  ~cli.py~ lines 416–420 add ~-v~ / ~--verbose~ to the top-level
+parser only.  The 7 subparsers (~harvest-pip~, ~transform-html~,
+~transform-pdf~, ~transform-alto~, ~transform-mods~, ~transform-images~,
+~compile-sip~, ~run-pipeline~) each accept ~args.verbose~ in their handler
+functions (they call ~setup_logging(args.verbose)~), but none defines
+the argument — so argparse never populates it when ~-v~ appears after the
+subcommand name.
+
+The idiomatic fix is a shared parent parser:
+
+#+begin_example
+verbose_parser = argparse.ArgumentParser(add_help=False)
+verbose_parser.add_argument("-v", "--verbose", action="store_true",
+                            help="Enable verbose output")
+
+harvest_parser = subparsers.add_parser(
+    "harvest-pip", parents=[verbose_parser], ...
+)
+#+end_example
+
+This needs to be applied to all 7 ~add_parser~ calls — mechanical but
+straightforward.  The top-level ~-v~ can be retained for backwards
+compatibility (it still works in its current position) or removed to
+avoid duplication.
+
+Open questions:
+- Keep the top-level ~-v~ for backwards compatibility, or remove it and
+  standardise on subcommand-level only?
+
+Recommended disposition: Fix now
+**** Response
+Eventually I think we'll want to upgrade the CLI to use something more
+modern like Click or Typer, but for now reove the top-level verbose flag
+and standardize on the subcommand level.
+
+** Test Coverage Gaps
+
+*** TODO [#C] ~plumbing.py~ base classes lack unit tests
+:PROPERTIES:
+:CUSTOM_ID: review/test-gap-plumbing
+:DISPOSITION: fix now
+:END:
+~Filter.run_once~, ~run_forever~, ~_recover_orphaned_tokens~, and ~Pipeline.snapshot~
+are tested indirectly through orchestrator tests but have no dedicated unit tests.
+
+**** Notes
+The orchestrator integration tests (~TestOrchestrator~) exercise the full
+pipeline and implicitly cover much of this behavior, but there are specific
+gaps worth closing:
+
+- ~_recover_orphaned_tokens~: no test seeds a ~.bak~ file and verifies it
+  is recovered to ~.json~.  This is safety-critical behavior (ensures
+  tokens are not silently lost after a crash) and deserves its own test.
+
+- ~Pipeline.snapshot~: never tested.  One test that creates buckets with
+  known token files and asserts the correct counts would suffice.
+
+- ~Filter.run_forever~ and signal handling: hard to unit-test
+  deterministically; skipping is reasonable.
+
+- ~Filter.run_once~ base behavior (error routing, token log entries): the
+  filter subclass tests implicitly test this, since the base class method
+  is inherited unchanged.  Arguably sufficient.
+
+Priority: ~_recover_orphaned_tokens~ is the most valuable gap to close.
+
+Open questions:
+- None — scope is clear.
+
+Recommended disposition: Fix now (~_recover_orphaned_tokens~ and ~snapshot~
+only; skip ~run_forever~ signal tests as impractical)
+
+*** TODO [#C] Individual pipeline filters are not unit-tested
+:PROPERTIES:
+:CUSTOM_ID: review/test-gap-filters
+:DISPOSITION: fix now
+:END:
+~test_pipeline_filters.py~ exists but may only cover happy-path scenarios.
+Token validation failures and per-filter edge cases (missing ~sip_path~,
+transformer error propagation) are likely not covered.
+
+**** Notes
+After reading ~test_pipeline_filters.py~ in full, the picture is better
+than the review note suggested.  Each SIP filter class already has:
+
+- Happy-path (token advances to output) ✓
+- Missing ~sip_path~ → ~.err~ ✓
+- Transformer exception → ~.err~ ✓
+
+The one gap that exists across ~PdfFilter~, ~AltoFilter~, ~ModsFilter~,
+and ~ImageFilter~ is the ~validation_errors~ propagation test.  ~HtmlFilter~
+has ~test_validation_errors_stored_on_token~ (line 160), but the four SIP
+transformer filters do not.  Adding it to each is four near-identical
+tests — or one parameterised test if we pursue the ~SIPTransformerFilter~
+refactor first.
+
+Open questions:
+- Add the ~validation_errors~ test now, or wait until
+  ~review/filter-duplication~ is done (so it can be a single
+  parameterised test over all four filters)?
+
+Recommended disposition: Fix now (can write four simple tests immediately;
+or defer the parameterised version to after the refactor — either is fine)
+
+*** DONE [#C] ~_parse_published_date~ edge cases not tested
+:PROPERTIES:
+:CUSTOM_ID: review/test-gap-ceo-client-date
+:DISPOSITION: fix now
+:END:
+The ~date.min~ truncation bug (see above) is not exercised by tests.  Add a test
+with an article that has ~published_at = None~ mid-page to confirm it does not
+stop pagination.
+
+**** Notes
+This test gap is directly coupled to the fix for
+~review/ceo-client-date-min-bug~ and should live in the same PR.
+
+The test scenario needs to simulate two pages of API results where a
+~None~ ~published_at~ article appears on the first page between two valid
+articles:
+
+#+begin_example
+page 1: [valid 2026-01-15 article,
+         article with published_at=None,   ← currently stops pagination
+         valid 2026-01-15 article]
+page 2: [valid 2026-01-15 article]         ← currently never fetched
+#+end_example
+
+With the fix in place, the test should assert:
+- All three valid articles are returned (the ~None~ article is skipped)
+- A warning is logged for the skipped article
+- Pagination continues to page 2
+
+This is straightforward to write with ~unittest.mock.patch~ on
+~CeoClient.get~ returning canned JSON.
+
+Open questions:
+- None — bundle with the ~review/ceo-client-date-min-bug~ fix.
+
+Recommended disposition: Fix now (in the same PR as the bug fix)
+
 * Ad Hoc TODOs
 ** TODO [#C] Consider adding lxml type stubs
 :PROPERTIES:

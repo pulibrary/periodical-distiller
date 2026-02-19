@@ -9,6 +9,7 @@ from pathlib import Path
 from periodical_distiller.aggregators import PIPAggregator
 from periodical_distiller.clients import CeoClient
 from periodical_distiller.compilers import VeridianSIPCompiler
+from periodical_distiller.pipeline.orchestrator import Orchestrator
 from periodical_distiller.transformers import ALTOTransformer, HTMLTransformer, ImageTransformer, MODSTransformer, PDFTransformer
 
 DEFAULT_OUTPUT_DIR = Path("./workspace/pips")
@@ -345,6 +346,60 @@ def compile_sip(args: argparse.Namespace) -> int:
         return 1
 
 
+def run_pipeline(args: argparse.Namespace) -> int:
+    """Execute the run-pipeline command.
+
+    Args:
+        args: Parsed command-line arguments
+
+    Returns:
+        Exit code (0 for success, non-zero for errors)
+    """
+    setup_logging(args.verbose)
+    logger = logging.getLogger(__name__)
+
+    pip_path = args.pip.resolve()
+    if not pip_path.exists():
+        logger.error(f"PIP directory not found: {pip_path}")
+        return 1
+
+    manifest_path = pip_path / "pip-manifest.json"
+    if not manifest_path.exists():
+        logger.error(f"PIP manifest not found: {manifest_path}")
+        return 1
+
+    output_dir = args.output
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    workspace = args.workspace or pip_path.parent / "pipeline-workspace" / pip_path.name
+    workspace.mkdir(parents=True, exist_ok=True)
+
+    try:
+        orchestrator = Orchestrator(workspace=workspace, sip_output=output_dir)
+        token = orchestrator.run(pip_path)
+
+        status = token.get_prop("status") or "unknown"
+        mets_path = token.get_prop("mets_path")
+        validation_errors = token.get_prop("validation_errors") or []
+
+        logger.info(f"Pipeline complete for {pip_path.name}")
+        logger.info(f"  Status: {status}")
+        if mets_path:
+            logger.info(f"  METS: {mets_path}")
+        logger.info(f"  Output: {output_dir / pip_path.name}")
+
+        if validation_errors:
+            logger.warning(f"  Errors: {len(validation_errors)}")
+            for error in validation_errors:
+                logger.warning(f"    - {error}")
+
+        return 0 if status == "sealed" else 1
+
+    except Exception as e:
+        logger.error(f"Pipeline failed: {e}")
+        return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     """Main entry point for the CLI.
 
@@ -492,6 +547,31 @@ def main(argv: list[str] | None = None) -> int:
         help="Path to the SIP directory",
     )
     compile_parser.set_defaults(func=compile_sip)
+
+    pipeline_parser = subparsers.add_parser(
+        "run-pipeline",
+        help="Run the full pipeline from PIP to sealed SIP",
+        description="Run a Primary Information Package (PIP) through the complete transformation pipeline to produce a sealed Veridian SIP.",
+    )
+    pipeline_parser.add_argument(
+        "--pip",
+        type=Path,
+        required=True,
+        help="Path to the PIP directory to process",
+    )
+    pipeline_parser.add_argument(
+        "--output",
+        type=Path,
+        default=DEFAULT_SIP_OUTPUT_DIR,
+        help=f"Output directory for SIPs (default: {DEFAULT_SIP_OUTPUT_DIR})",
+    )
+    pipeline_parser.add_argument(
+        "--workspace",
+        type=Path,
+        default=None,
+        help="Pipeline workspace directory for bucket state (default: <pip-parent>/pipeline-workspace/<pip-id>)",
+    )
+    pipeline_parser.set_defaults(func=run_pipeline)
 
     args = parser.parse_args(argv)
 

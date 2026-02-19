@@ -306,7 +306,7 @@ Recommended disposition: Fix now
 :DISPOSITION: fix now
 :END:
 
-*** TODO [#B] ~PACKAGE_ROOT~ computed via four ~.parent~ calls — fragile
+*** DONE [#B] ~PACKAGE_ROOT~ computed via four ~.parent~ calls — fragile
 :PROPERTIES:
 :CUSTOM_ID: review/package-root-fragile
 :DISPOSITION: add comment
@@ -379,7 +379,7 @@ package grows further.  Options:
    ~src/periodical_distiller/resources/~, declare package data in
    ~pyproject.toml~, switch to ~importlib.resources~.
 
-*** TODO [#C] Image DPI (150) is below archival standard
+*** DONE [#C] Image DPI (150) is below archival standard
 :PROPERTIES:
 :CUSTOM_ID: review/image-dpi-too-low
 :DISPOSITION: make configurable
@@ -418,7 +418,7 @@ Recommended disposition: Make configurable now ([#B] if Veridian requires
 **** Response
 Let's make it configurable for now, and I'll confirm with Veridian.
 
-*** TODO [#C] ~_copy_article_media~ return value is unused
+*** DONE [#C] ~_copy_article_media~ return value is unused
 :PROPERTIES:
 :CUSTOM_ID: review/copy-article-media-return-unused
 :DISPOSITION: fix now
@@ -456,7 +456,7 @@ Open questions:
 
 Recommended disposition: Fix now (change to ~None~ return)
 
-*** TODO [#C] ~_transform_article~ parameter ~pip_article~ is untyped
+*** DONE [#C] ~_transform_article~ parameter ~pip_article~ is untyped
 :PROPERTIES:
 :CUSTOM_ID: review/html-transformer-untyped-param
 :END:

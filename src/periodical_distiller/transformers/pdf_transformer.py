@@ -16,7 +16,9 @@ from .transformer import SIPTransformer
 
 logger = logging.getLogger(__name__)
 
-# Package root for locating resources
+# Resolve the project root (4 levels up from this file):
+#   pdf_transformer.py → transformers/ → periodical_distiller/ → src/ → project root
+# If this file is ever moved, the chain of .parent calls must be updated.
 PACKAGE_ROOT = Path(__file__).parent.parent.parent.parent
 STYLESHEETS_DIR = PACKAGE_ROOT / "resources" / "stylesheets"
 

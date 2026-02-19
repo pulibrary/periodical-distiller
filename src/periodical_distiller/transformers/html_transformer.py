@@ -10,10 +10,10 @@ import re
 import shutil
 from pathlib import Path
 
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, Template
 
 from schemas.ceo_item import CeoItem
-from schemas.pip import PIPManifest
+from schemas.pip import PIPArticle, PIPManifest
 from schemas.sip import SIPArticle, SIPManifest
 
 from .filters import FILTERS
@@ -21,7 +21,9 @@ from .transformer import PIPTransformer
 
 logger = logging.getLogger(__name__)
 
-# Package root for locating resources
+# Resolve the project root (4 levels up from this file):
+#   html_transformer.py → transformers/ → periodical_distiller/ → src/ → project root
+# If this file is ever moved, the chain of .parent calls must be updated.
 PACKAGE_ROOT = Path(__file__).parent.parent.parent.parent
 TEMPLATES_DIR = PACKAGE_ROOT / "resources" / "templates"
 STYLESHEETS_DIR = PACKAGE_ROOT / "resources" / "stylesheets"
@@ -135,9 +137,9 @@ class HTMLTransformer(PIPTransformer):
     def _transform_article(
         self,
         pip_path: Path,
-        pip_article,
+        pip_article: PIPArticle,
         sip_path: Path,
-        template,
+        template: Template,
     ) -> SIPArticle:
         """Transform a single article from PIP to SIP.
 
@@ -162,7 +164,7 @@ class HTMLTransformer(PIPTransformer):
         images_dir = article_dir / "images"
         charts_dir = article_dir / "charts"
 
-        copied_media = self._copy_article_media(
+        self._copy_article_media(
             pip_path, pip_article, article_dir, images_dir, charts_dir
         )
 
@@ -196,11 +198,11 @@ class HTMLTransformer(PIPTransformer):
     def _copy_article_media(
         self,
         pip_path: Path,
-        pip_article,
+        pip_article: PIPArticle,
         article_dir: Path,
         images_dir: Path,
         charts_dir: Path,
-    ) -> list[str]:
+    ) -> None:
         """Copy media files from PIP to SIP article directory.
 
         Args:
@@ -209,12 +211,7 @@ class HTMLTransformer(PIPTransformer):
             article_dir: SIP article directory
             images_dir: Target directory for images
             charts_dir: Target directory for charts
-
-        Returns:
-            List of copied file paths (relative to article_dir)
         """
-        copied = []
-
         for media in pip_article.media:
             src_path = pip_path / media.local_path
 
@@ -230,10 +227,7 @@ class HTMLTransformer(PIPTransformer):
                 dst_path = images_dir / src_path.name
 
             shutil.copy2(src_path, dst_path)
-            copied.append(str(dst_path.relative_to(article_dir)))
             logger.debug(f"Copied media {src_path.name}")
-
-        return copied
 
     def _find_featured_image_path(
         self,

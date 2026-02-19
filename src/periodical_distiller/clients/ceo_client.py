@@ -1,5 +1,6 @@
 """CEO API client for fetching Daily Princetonian content."""
 
+import logging
 from datetime import date, datetime
 from typing import Any
 
@@ -9,6 +10,8 @@ from schemas.ceo_item import CeoItem
 
 from .client import Client
 from .exceptions import ValidationError
+
+logger = logging.getLogger(__name__)
 
 
 class CeoClient(Client):
@@ -73,6 +76,14 @@ class CeoClient(Client):
 
             for article in articles:
                 pub_date = self._parse_published_date(article.get("published_at"))
+
+                if pub_date == date.min:
+                    logger.warning(
+                        "Skipping article %s: unparseable published_at %r",
+                        article.get("id", "<unknown>"),
+                        article.get("published_at"),
+                    )
+                    continue
 
                 if date_end is not None and pub_date > date_end:
                     continue

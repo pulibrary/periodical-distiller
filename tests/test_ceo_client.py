@@ -159,7 +159,7 @@ class TestCeoClientFetch:
         """fetch() raises ValidationError when data fails schema validation."""
         client = CeoClient(ceo_config)
 
-        invalid_record = {"id": "12345"}  # Missing required fields
+        invalid_record = {"id": "12345", "published_at": "2026-01-15 10:00:00"}  # Missing required fields
 
         mock_http_client = MagicMock()
         mock_http_client.request.return_value = make_ceo_response([invalid_record])
@@ -313,6 +313,109 @@ class TestCeoClientConvenienceMethods:
         items = client.fetch_by_date_range(date(2026, 1, 10), date(2026, 1, 20), validate=False)
 
         assert isinstance(items[0], dict)
+
+
+class TestCeoClientDateMinSkip:
+    """Tests that articles with unparseable dates are skipped, not halting pagination."""
+
+    def test_none_published_at_is_skipped(self, ceo_config, sample_ceo_record, caplog):
+        """Article with published_at=None is skipped with a warning."""
+        client = CeoClient(ceo_config)
+
+        valid1 = sample_ceo_record.copy()
+        valid1["id"] = "111"
+        valid1["ceo_id"] = "111"
+        valid1["published_at"] = "2026-01-15 10:00:00"
+
+        null_date = sample_ceo_record.copy()
+        null_date["id"] = "999"
+        null_date["ceo_id"] = "999"
+        null_date["published_at"] = None
+
+        valid2 = sample_ceo_record.copy()
+        valid2["id"] = "222"
+        valid2["ceo_id"] = "222"
+        valid2["published_at"] = "2026-01-15 14:00:00"
+
+        mock_http_client = MagicMock()
+        mock_http_client.request.return_value = make_ceo_response(
+            [valid1, null_date, valid2]
+        )
+        client._client = mock_http_client
+
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="periodical_distiller.clients.ceo_client"):
+            items = client.fetch(date_start=date(2026, 1, 15), validate=False)
+
+        assert len(items) == 2
+        assert {i["id"] for i in items} == {"111", "222"}
+        assert any("999" in msg and "None" in msg for msg in caplog.messages)
+
+    def test_invalid_published_at_is_skipped(self, ceo_config, sample_ceo_record, caplog):
+        """Article with garbled published_at is skipped with a warning."""
+        client = CeoClient(ceo_config)
+
+        valid = sample_ceo_record.copy()
+        valid["id"] = "111"
+        valid["ceo_id"] = "111"
+        valid["published_at"] = "2026-01-15 10:00:00"
+
+        garbled = sample_ceo_record.copy()
+        garbled["id"] = "888"
+        garbled["ceo_id"] = "888"
+        garbled["published_at"] = "not-a-date"
+
+        mock_http_client = MagicMock()
+        mock_http_client.request.return_value = make_ceo_response([valid, garbled])
+        client._client = mock_http_client
+
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="periodical_distiller.clients.ceo_client"):
+            items = client.fetch(date_start=date(2026, 1, 15), validate=False)
+
+        assert len(items) == 1
+        assert items[0]["id"] == "111"
+        assert any("888" in msg and "not-a-date" in msg for msg in caplog.messages)
+
+    def test_pagination_continues_past_null_published_at(
+        self, ceo_config, sample_ceo_record, caplog
+    ):
+        """Null published_at on page 1 does not halt pagination to page 2."""
+        client = CeoClient(ceo_config)
+
+        def make_record(record_id, published_at):
+            r = sample_ceo_record.copy()
+            r["id"] = record_id
+            r["ceo_id"] = record_id
+            r["published_at"] = published_at
+            return r
+
+        page1 = [
+            make_record("p1a1", "2026-01-15 10:00:00"),
+            make_record("p1a2", None),
+            make_record("p1a3", "2026-01-15 12:00:00"),
+        ]
+        page2 = [
+            make_record("p2a1", "2026-01-15 14:00:00"),
+        ]
+
+        mock_http_client = MagicMock()
+        mock_http_client.request.side_effect = [
+            make_ceo_response(page1, last_page=2, current_page=1),
+            make_ceo_response(page2, last_page=2, current_page=2),
+        ]
+        client._client = mock_http_client
+
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="periodical_distiller.clients.ceo_client"):
+            items = client.fetch(date_start=date(2026, 1, 15), validate=False)
+
+        assert len(items) == 3
+        assert {i["id"] for i in items} == {"p1a1", "p1a3", "p2a1"}
+        assert mock_http_client.request.call_count == 2
 
 
 class TestCeoClientContextManager:

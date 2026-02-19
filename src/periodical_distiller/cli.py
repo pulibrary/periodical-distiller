@@ -408,14 +408,19 @@ def main(argv: list[str] | None = None) -> int:
     Returns:
         Exit code
     """
-    parser = argparse.ArgumentParser(
-        prog="periodical-distiller",
-        description="Create METS/ALTO packages for Veridian ingest",
-    )
-    parser.add_argument(
+    # Shared parent parser that adds -v/--verbose to every subcommand.
+    # Using a parent keeps the flag after the subcommand name, which is the
+    # conventional position (e.g. `harvest-pip -v --date 2026-01-29`).
+    verbose_parser = argparse.ArgumentParser(add_help=False)
+    verbose_parser.add_argument(
         "-v", "--verbose",
         action="store_true",
         help="Enable verbose output",
+    )
+
+    parser = argparse.ArgumentParser(
+        prog="periodical-distiller",
+        description="Create METS/ALTO packages for Veridian ingest",
     )
 
     subparsers = parser.add_subparsers(
@@ -426,6 +431,7 @@ def main(argv: list[str] | None = None) -> int:
 
     harvest_parser = subparsers.add_parser(
         "harvest-pip",
+        parents=[verbose_parser],
         help="Fetch articles from CEO3 and create a PIP",
         description="Fetch articles from the CEO3 API and assemble them into a Primary Information Package (PIP).",
     )
@@ -465,6 +471,7 @@ def main(argv: list[str] | None = None) -> int:
 
     transform_parser = subparsers.add_parser(
         "transform-html",
+        parents=[verbose_parser],
         help="Transform a PIP into a SIP with HTML files",
         description="Transform a Primary Information Package (PIP) into a Submission Information Package (SIP) containing styled HTML articles.",
     )
@@ -484,6 +491,7 @@ def main(argv: list[str] | None = None) -> int:
 
     pdf_parser = subparsers.add_parser(
         "transform-pdf",
+        parents=[verbose_parser],
         help="Transform HTML files in a SIP to PDF",
         description="Transform HTML articles in a Submission Information Package (SIP) to PDF format using WeasyPrint.",
     )
@@ -497,6 +505,7 @@ def main(argv: list[str] | None = None) -> int:
 
     alto_parser = subparsers.add_parser(
         "transform-alto",
+        parents=[verbose_parser],
         help="Generate ALTO XML files from PDFs in a SIP",
         description="Extract word-level text from PDF articles in a Submission Information Package (SIP) and write ALTO 2.1 XML files.",
     )
@@ -510,6 +519,7 @@ def main(argv: list[str] | None = None) -> int:
 
     mods_parser = subparsers.add_parser(
         "transform-mods",
+        parents=[verbose_parser],
         help="Generate MODS XML files from CEO3 records in a SIP",
         description="Read CEO3 source records from the linked PIP and write MODS 3.8 XML files into a Submission Information Package (SIP).",
     )
@@ -523,6 +533,7 @@ def main(argv: list[str] | None = None) -> int:
 
     image_parser = subparsers.add_parser(
         "transform-image",
+        parents=[verbose_parser],
         help="Generate JPEG page images from PDFs in a SIP",
         description="Rasterize PDF articles in a Submission Information Package (SIP) to JPEG images at 150 DPI.",
     )
@@ -536,6 +547,7 @@ def main(argv: list[str] | None = None) -> int:
 
     compile_parser = subparsers.add_parser(
         "compile-sip",
+        parents=[verbose_parser],
         help="Compile METS and seal a SIP for Veridian ingest",
         description="Build a METS document from SIP and PIP manifests and seal the Submission Information Package for Veridian ingest.",
     )
@@ -549,6 +561,7 @@ def main(argv: list[str] | None = None) -> int:
 
     pipeline_parser = subparsers.add_parser(
         "run-pipeline",
+        parents=[verbose_parser],
         help="Run the full pipeline from PIP to sealed SIP",
         description="Run a Primary Information Package (PIP) through the complete transformation pipeline to produce a sealed Veridian SIP.",
     )

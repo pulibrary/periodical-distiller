@@ -590,7 +590,7 @@ class TestCLIMain:
         assert exc_info.value.code == 0
 
     def test_verbose_flag_accepted(self, capsys):
-        """Verbose flag is accepted."""
-        result = main(["-v", "harvest-pip"])
+        """Verbose flag is accepted after the subcommand name."""
+        result = main(["harvest-pip", "-v"])
 
         assert result == 1  # Fails due to missing date, but -v was accepted

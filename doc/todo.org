@@ -702,7 +702,7 @@ file.
 
 ** CLI
 
-*** TODO [#B] ~--verbose~ only works before the subcommand name
+*** DONE [#B] ~--verbose~ only works before the subcommand name
 :PROPERTIES:
 :CUSTOM_ID: review/cli-verbose-placement
 :DISPOSITION: fix now

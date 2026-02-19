@@ -14,6 +14,7 @@ This module provides the core abstractions for the pipeline:
 import json
 import logging
 import signal
+from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
 from time import sleep
@@ -124,19 +125,19 @@ class Pipe:
             raise ValueError("no token or token name")
 
     def out_path(self, token: Token) -> Path:
-        if self.token and self.token.name:
+        if token is not None and token.name is not None:
             return self.output / Path(token.name).with_suffix(".json")
         else:
             raise ValueError("no token or token name")
 
     def marked_path(self, token: Token) -> Path:
-        if self.token and self.token.name:
+        if token is not None and token.name is not None:
             return self.input / Path(token.name).with_suffix(".bak")
         else:
             raise ValueError("no token or token name")
 
     def error_path(self, token: Token) -> Path:
-        if self.token and self.token.name:
+        if token is not None and token.name is not None:
             return self.input / Path(token.name).with_suffix(".err")
         else:
             raise ValueError("no token or token name")
@@ -269,9 +270,9 @@ class Pipe:
             self.token = None
 
 
-class Filter:
+class Filter(ABC):
     """
-    Base class for pipeline processing stages.
+    Abstract base class for pipeline processing stages.
 
     Filters are the individual processing stages that transform tokens as they
     flow through the pipeline. Each filter implements specific validation and
@@ -379,6 +380,7 @@ class Filter:
 
         logger.info(f"{self.stage_name}: Exiting gracefully")
 
+    @abstractmethod
     def process_token(self, token: Token) -> bool:
         """Process a token - must be implemented by subclasses.
 
@@ -387,12 +389,9 @@ class Filter:
 
         Returns:
             True if processing succeeded, False otherwise
-
-        Raises:
-            NotImplementedError: If not implemented by subclass
         """
-        raise NotImplementedError("Subclasses must implement process_token()")
 
+    @abstractmethod
     def validate_token(self, token: Token) -> bool:
         """Validate a token before processing - must be implemented by subclasses.
 
@@ -401,11 +400,7 @@ class Filter:
 
         Returns:
             True if token is valid for processing, False otherwise
-
-        Raises:
-            NotImplementedError: If not implemented by subclass
         """
-        raise NotImplementedError("Subclasses must implement validate_token()")
 
 
 class Pipeline:

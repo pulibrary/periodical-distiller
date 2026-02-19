@@ -14,7 +14,7 @@ from periodical_distiller.pipeline.filters.image_filter import ImageFilter
 from periodical_distiller.pipeline.filters.mets_filter import MetsFilter
 from periodical_distiller.pipeline.filters.mods_filter import ModsFilter
 from periodical_distiller.pipeline.filters.pdf_filter import PdfFilter
-from periodical_distiller.pipeline.plumbing import Pipeline, Token, dump_token
+from periodical_distiller.pipeline.plumbing import Pipeline, Token, dump_token, load_token
 from periodical_distiller.transformers.alto_transformer import ALTOTransformer
 from periodical_distiller.transformers.html_transformer import HTMLTransformer
 from periodical_distiller.transformers.image_transformer import ImageTransformer
@@ -136,8 +136,6 @@ class Orchestrator:
 
     def _find_token(self, issue_id: str) -> Token:
         """Find the token in any bucket (sip_complete first, then error states)."""
-        from periodical_distiller.pipeline.plumbing import load_token
-
         sip_complete = self.pipeline.bucket("sip_complete")
         token_path = sip_complete / f"{issue_id}.json"
         if token_path.exists():

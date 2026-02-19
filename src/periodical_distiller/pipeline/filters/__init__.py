@@ -6,6 +6,7 @@ from .image_filter import ImageFilter
 from .mets_filter import MetsFilter
 from .mods_filter import ModsFilter
 from .pdf_filter import PdfFilter
+from .sip_transformer_filter import SIPTransformerFilter
 
 __all__ = [
     "AltoFilter",
@@ -14,4 +15,5 @@ __all__ = [
     "MetsFilter",
     "ModsFilter",
     "PdfFilter",
+    "SIPTransformerFilter",
 ]

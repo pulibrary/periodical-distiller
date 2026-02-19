@@ -236,7 +236,7 @@ class TestFilter:
     """Tests for Filter base class."""
 
     def test_filter_requires_implementation(self, tmp_path):
-        """Filter subclass must implement process_token and validate_token."""
+        """Filter subclass missing abstract methods cannot be instantiated."""
         in_path = tmp_path / "input"
         out_path = tmp_path / "output"
         in_path.mkdir()
@@ -244,20 +244,14 @@ class TestFilter:
 
         pipe = Pipe(in_path, out_path)
 
-        # Create a minimal filter that doesn't implement required methods
-        filter_instance = Filter.__new__(Filter)
-        filter_instance.pipe = pipe
-        filter_instance.stage_name = "test"
-        filter_instance.poll_interval = 5
-        filter_instance.shutdown_requested = False
+        # A subclass that omits both abstract methods raises TypeError at
+        # instantiation time — the ABC machinery catches the gap before any
+        # token is ever processed.
+        class IncompleteFilter(Filter):
+            pass
 
-        token = Token({"id": "test"})
-
-        with pytest.raises(NotImplementedError):
-            filter_instance.process_token(token)
-
-        with pytest.raises(NotImplementedError):
-            filter_instance.validate_token(token)
+        with pytest.raises(TypeError):
+            IncompleteFilter(pipe)
 
     def test_filter_recovers_orphaned_tokens(self, tmp_path):
         """Filter recovers .bak files on startup."""

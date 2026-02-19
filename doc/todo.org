@@ -588,7 +588,7 @@ checksum is probably superfluous.  But I'll confirm with Veridian.
 
 ** Pipeline
 
-*** TODO [#B] ~Filter.process_token~ / ~validate_token~ should be ~@abstractmethod~
+*** DONE [#B] ~Filter.process_token~ / ~validate_token~ should be ~@abstractmethod~
 :PROPERTIES:
 :CUSTOM_ID: review/filter-not-abstract
 :DISPOSITION: use ABC
@@ -636,7 +636,7 @@ Recommended disposition: Fix now
 The Pipeline code was ported rather bluntly from another
 codebase. Refactoring now is a good idea.
 
-*** TODO [#B] ~Pipe.out_path~ / ~marked_path~ / ~error_path~ guard on wrong variable
+*** DONE [#B] ~Pipe.out_path~ / ~marked_path~ / ~error_path~ guard on wrong variable
 :PROPERTIES:
 :CUSTOM_ID: review/pipe-method-guard-bug
 :DISPOSITION: fix now
@@ -676,7 +676,7 @@ Open questions:
 
 Recommended disposition: Fix now
 
-*** TODO [#C] Individual pipeline filters have significant code duplication
+*** DONE [#C] Individual pipeline filters have significant code duplication
 :PROPERTIES:
 :CUSTOM_ID: review/filter-duplication
 :DISPOSITION: refactor
@@ -689,7 +689,7 @@ Only the transformer call and the token field differ.
   ~SIPTransformer~ instance that handles the boilerplate, leaving only field-specific
   logic in subclasses.
 
-*** TODO [#C] ~_find_token~ import inside method body
+*** DONE [#C] ~_find_token~ import inside method body
 :PROPERTIES:
 :CUSTOM_ID: review/orchestrator-inline-import
 :DISPOSITION: remove inline import

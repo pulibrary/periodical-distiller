@@ -300,6 +300,8 @@ class IssueCollector(Filter):
 - MODS Transformer :: a module that creates a MODS relatedItem element
   for each CEO record, or a top-level MODS document for the
   aggregation, for inclusion in the METS document.
+- Image Transformer :: a module that rasterizes each page of a PDF
+  article to a JPEG image at 150 DPI for display in Veridian.
 - METS Compiler :: a module that creates a file system containing
   derivatives and a METS document.
 
@@ -346,11 +348,13 @@ derivatives from a PIP.
 - periodical_distiller
   - README.md
   - LICENSE
-  - .env
-    .tool_versions
-    .gitignore
-  - docs
+  - CLAUDE.md
   - pyproject.toml
+  - pdm.lock
+  - .gitignore
+  - doc
+    - design.org
+    - todo.org
   - resources
     - schemas                    # LOC XSD schemas for validation
       - alto-4-4.xsd
@@ -373,53 +377,85 @@ derivatives from a PIP.
       - __init__.py
       - aggregators
         - __init__.py
-        - ceo_aggregator.py
+        - pip_aggregator.py      # Assembles PIP from CEO3 records
+        - media_downloader.py    # Downloads article images/media
       - clients
         - __init__.py
-        - client.py
-        - ceo_client.py
+        - client.py              # Base HTTP client
+        - ceo_client.py          # Daily Princetonian CEO3 API client
+        - exceptions.py          # Client-specific exceptions
       - transformers
         - __init__.py
-        - transformer.py
-        - html_transformer.py
-        - alto_transformer.py
-        - mods_transformer.py
-        - text_transformer.py
-        - pdf_transformer.py
-      - serializers
-        - __init__.py
-        - serializer.py
-        - html_serializer.py
-        - alto_serializer.py
-        - mods_serializer.py
-        - text_serializer.py
-        - pdf_serializer.py
+        - transformer.py         # SIPTransformer base class
+        - filters.py             # Internal filter helpers (date/section)
+        - html_transformer.py    # CEO record → styled HTML
+        - pdf_transformer.py     # HTML → PDF (WeasyPrint)
+        - alto_transformer.py    # PDF → ALTO 2.1 XML
+        - mods_transformer.py    # CEO record → MODS 3.8 XML
+        - image_transformer.py   # PDF → 150 DPI JPEG page images
       - compilers
         - __init__.py
-        - compiler.py
-        - mets_compiler.py
-        - veridian_sip_compiler.py
-      - pipeline                  # Kanban-style pipeline orchestration
+        - compiler.py            # Abstract SIPCompiler base class
+        - mets_compiler.py       # Builds METS document from SIP manifest
+        - veridian_sip_compiler.py  # Calls METSCompiler; seals SIP
+      - pipeline                 # Pipeline orchestration
         - __init__.py
-        - plumbing.py             # Token, Pipe, Bucket, Filter base class
-        - orchestrator.py         # Coordinates filters via config
-        - filters                 # Pipeline stages (token handling)
+        - plumbing.py            # Token, Pipe, Bucket, Filter base class
+        - orchestrator.py        # Coordinates filter chain via config
+        - filters
           - __init__.py
-          - harvest_filter.py     # Uses CeoClient
-          - html_filter.py        # Uses HtmlTransformer
-          - pdf_filter.py         # Uses PdfTransformer
-          - alto_filter.py        # Uses AltoTransformer
-          - mods_filter.py        # Uses ModsTransformer
-          - collection_filter.py  # Polls for completed articles
-          - mets_filter.py        # Uses MetsCompiler
-          - validation_filter.py  # Uses LOC schemas
-          - packaging_filter.py   # Assembles final SIP
-      - orchestrators             # (legacy, to be replaced by pipeline)
-        - __init__.py
+          - html_filter.py       # Runs HtmlTransformer
+          - pdf_filter.py        # Runs PdfTransformer
+          - alto_filter.py       # Runs AltoTransformer
+          - mods_filter.py       # Runs ModsTransformer
+          - image_filter.py      # Runs ImageTransformer
+          - mets_filter.py       # Runs VeridianSIPCompiler
+      - serializers
+        - __init__.py            # stub — not yet implemented
       - validators
-        - __init__.py
+        - __init__.py            # stub — not yet implemented
       - cli.py
   - tests
     - __init__.py
     - conftest.py
     - data
+
+** Implementation Status
+
+The following modules are fully implemented:
+
+- CEO Client (~clients/ceo_client.py~) :: fetches articles from the
+  Daily Princetonian CEO3 endpoint with date filtering.
+- PIP Aggregator (~aggregators/pip_aggregator.py~, ~media_downloader.py~)
+  :: assembles fetched articles and media into a PIP directory.
+- HTML Transformer (~transformers/html_transformer.py~) :: renders
+  CEO3 records to styled HTML via Jinja2 templates.
+- PDF Transformer (~transformers/pdf_transformer.py~) :: converts HTML
+  to PDF using WeasyPrint.
+- ALTO Transformer (~transformers/alto_transformer.py~) :: extracts
+  word-level text from PDFs into ALTO 2.1 XML.
+- MODS Transformer (~transformers/mods_transformer.py~) :: writes MODS
+  3.8 XML from CEO3 source records.
+- Image Transformer (~transformers/image_transformer.py~) :: rasterizes
+  PDF pages to 150 DPI JPEG images.
+- METS Compiler (~compilers/mets_compiler.py~) :: builds a complete
+  METS document from the SIP manifest.
+- Veridian SIP Compiler (~compilers/veridian_sip_compiler.py~) :: calls
+  METSCompiler and seals the SIP for Veridian ingest.
+- Pipeline Orchestrator (~pipeline/~) :: plumbing, orchestrator, and
+  per-stage filters (html, pdf, alto, mods, image, mets).
+- CLI (~cli.py~) :: eight commands — ~harvest-pip~, ~transform-html~,
+  ~transform-pdf~, ~transform-alto~, ~transform-mods~, ~transform-image~,
+  ~compile-sip~, ~run-pipeline~.
+
+The following modules are stubs or planned for future work:
+
+- Serializers :: ~serializers/__init__.py~ exists but contains no
+  implementation.  Derivatives are currently written directly by
+  transformers.  A separate serializer layer is planned to decouple
+  transformation logic from I/O.
+- Validators :: ~validators/__init__.py~ exists but contains no
+  implementation.  Schema validation against the LOC XSD schemas
+  (ALTO 4.4, MODS 3.8, METS) is planned.
+- Loaders :: not yet started.  Will complement transformers by reading
+  existing derivative files back into the pipeline.

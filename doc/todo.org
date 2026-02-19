@@ -752,7 +752,7 @@ and standardize on the subcommand level.
 
 ** Test Coverage Gaps
 
-*** TODO [#C] ~plumbing.py~ base classes lack unit tests
+*** DONE [#C] ~plumbing.py~ base classes lack unit tests
 :PROPERTIES:
 :CUSTOM_ID: review/test-gap-plumbing
 :DISPOSITION: fix now
@@ -787,7 +787,7 @@ Open questions:
 Recommended disposition: Fix now (~_recover_orphaned_tokens~ and ~snapshot~
 only; skip ~run_forever~ signal tests as impractical)
 
-*** TODO [#C] Individual pipeline filters are not unit-tested
+*** DONE [#C] Individual pipeline filters are not unit-tested
 :PROPERTIES:
 :CUSTOM_ID: review/test-gap-filters
 :DISPOSITION: fix now

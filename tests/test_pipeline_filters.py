@@ -12,6 +12,7 @@ from periodical_distiller.pipeline.filters.image_filter import ImageFilter
 from periodical_distiller.pipeline.filters.mets_filter import MetsFilter
 from periodical_distiller.pipeline.filters.mods_filter import ModsFilter
 from periodical_distiller.pipeline.filters.pdf_filter import PdfFilter
+from periodical_distiller.pipeline.filters.sip_transformer_filter import SIPTransformerFilter
 from periodical_distiller.pipeline.orchestrator import Orchestrator
 from periodical_distiller.pipeline.plumbing import Pipe, Token, dump_token, load_token
 from schemas.pip import PIPArticle, PIPManifest
@@ -400,6 +401,43 @@ class TestImageFilter:
         f = ImageFilter(pipe=Pipe(in_bucket, out_bucket), transformer=bad_transformer)
         assert f.run_once() is False
         assert (in_bucket / "2026-01-29.err").exists()
+
+
+# ---------------------------------------------------------------------------
+# Tests: SIPTransformerFilter — validation_errors propagation
+# ---------------------------------------------------------------------------
+
+class TestSIPTransformerFilterValidationErrors:
+    """Verify that all SIPTransformerFilter subclasses propagate validation_errors.
+
+    HtmlFilter already has test_validation_errors_stored_on_token; this class
+    covers the four SIPTransformer-backed filters with a single parametrized test.
+    """
+
+    @pytest.mark.parametrize("filter_cls", [PdfFilter, AltoFilter, ModsFilter, ImageFilter])
+    def test_validation_errors_stored_on_token(self, filter_cls, tmp_path):
+        """Manifest validation_errors are written to the token for all SIP filters."""
+        in_bucket = tmp_path / "in"
+        out_bucket = tmp_path / "out"
+        in_bucket.mkdir()
+        out_bucket.mkdir()
+
+        _seed_token(in_bucket, "2026-01-29", {"sip_path": "/some/sip"})
+
+        manifest_with_errors = _make_manifest()
+        manifest_with_errors.validation_errors = ["Article 99: transform failed"]
+
+        mock_transformer = MagicMock()
+        mock_transformer.transform.return_value = manifest_with_errors
+
+        f = filter_cls(pipe=Pipe(in_bucket, out_bucket), transformer=mock_transformer)
+        result = f.run_once()
+
+        # Token still advances — validation_errors are non-fatal
+        assert result is True
+        token_data = json.loads((out_bucket / "2026-01-29.json").read_text())
+        assert "validation_errors" in token_data
+        assert "Article 99: transform failed" in token_data["validation_errors"]
 
 
 # ---------------------------------------------------------------------------

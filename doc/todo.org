@@ -226,7 +226,7 @@ in batch mode where a single 503 would be re-run manually anyway)
 :DISPOSITION: remove the method
 :END:
 
-*** TODO [#B] ~MediaDownloader~ created by ~PIPAggregator~ is never closed
+*** DONE [#B] ~MediaDownloader~ created by ~PIPAggregator~ is never closed
 :PROPERTIES:
 :CUSTOM_ID: review/media-downloader-resource-leak
 :DISPOSITION: fix now
@@ -278,7 +278,7 @@ Recommended disposition: Fix now
 **** Response
 Use the Context-manager approach.
 
-*** TODO [#C] ~MediaDownloader._build_media_url~ (singular) is dead code
+*** DONE [#C] ~MediaDownloader._build_media_url~ (singular) is dead code
 :PROPERTIES:
 :CUSTOM_ID: review/media-downloader-dead-method
 :END:

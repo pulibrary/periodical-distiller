@@ -100,46 +100,53 @@ class TestMediaDownloaderClientConfig:
         downloader.close()
 
 
-class TestBuildMediaUrl:
-    """Tests for MediaDownloader._build_media_url()."""
+class TestBuildMediaUrls:
+    """Tests for MediaDownloader._build_media_urls()."""
 
-    def test_build_media_url(self, sample_ceo_media):
-        """URL is constructed correctly from CeoMedia fields."""
+    def test_build_media_urls_primary(self, sample_ceo_media):
+        """Primary URL is sized imgix URL."""
         downloader = MediaDownloader()
 
-        url = downloader._build_media_url(sample_ceo_media)
+        urls = downloader._build_media_urls(sample_ceo_media)
 
-        expected = "https://snworksceo.imgix.net/pri/attach-uuid-456.sized-1000x1000.jpg"
-        assert url == expected
+        assert urls[0] == "https://snworksceo.imgix.net/pri/attach-uuid-456.sized-1000x1000.jpg"
 
-    def test_build_media_url_with_png(self, sample_ceo_media):
+    def test_build_media_urls_fallback(self, sample_ceo_media):
+        """Fallback URL omits the size suffix."""
+        downloader = MediaDownloader()
+
+        urls = downloader._build_media_urls(sample_ceo_media)
+
+        assert urls[1] == "https://snworksceo.imgix.net/pri/attach-uuid-456.jpg"
+
+    def test_build_media_urls_png(self, sample_ceo_media):
         """URL handles different extensions."""
         sample_ceo_media.extension = "png"
         downloader = MediaDownloader()
 
-        url = downloader._build_media_url(sample_ceo_media)
+        urls = downloader._build_media_urls(sample_ceo_media)
 
-        expected = "https://snworksceo.imgix.net/pri/attach-uuid-456.sized-1000x1000.png"
-        assert url == expected
+        assert urls[0] == "https://snworksceo.imgix.net/pri/attach-uuid-456.sized-1000x1000.png"
 
-    def test_build_media_url_heic_converts_to_jpg(self, sample_ceo_media):
-        """HEIC files are requested as JPG from imgix."""
+    def test_build_media_urls_heic_fallbacks(self, sample_ceo_media):
+        """HEIC files get jpg and png fallback URLs."""
         sample_ceo_media.extension = "heic"
         downloader = MediaDownloader()
 
-        url = downloader._build_media_url(sample_ceo_media)
+        urls = downloader._build_media_urls(sample_ceo_media)
 
-        expected = "https://snworksceo.imgix.net/pri/attach-uuid-456.sized-1000x1000.jpg"
-        assert url == expected
+        assert urls[0].endswith(".jpg")
+        assert any("png" in u for u in urls)
+        assert len(urls) == 4
 
-    def test_build_media_url_heic_case_insensitive(self, sample_ceo_media):
+    def test_build_media_urls_heic_case_insensitive(self, sample_ceo_media):
         """HEIC detection is case-insensitive."""
         sample_ceo_media.extension = "HEIC"
         downloader = MediaDownloader()
 
-        url = downloader._build_media_url(sample_ceo_media)
+        urls = downloader._build_media_urls(sample_ceo_media)
 
-        assert url.endswith(".jpg")
+        assert urls[0].endswith(".jpg")
 
 
 class TestComputeChecksum:

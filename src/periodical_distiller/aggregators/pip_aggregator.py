@@ -2,7 +2,7 @@
 
 import json
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from periodical_distiller.aggregators.media_downloader import MediaDownloader
@@ -22,8 +22,8 @@ class PIPAggregator:
     Example:
         config = {"base_url": "https://www.dailyprincetonian.com"}
         with CeoClient(config) as client:
-            aggregator = PIPAggregator(Path("./workspace/pips"), client)
-            manifest = aggregator.create_pip_for_date(date(2026, 1, 15))
+            with PIPAggregator(Path("./workspace/pips"), client) as aggregator:
+                manifest = aggregator.create_pip_for_date(date(2026, 1, 15))
     """
 
     def __init__(
@@ -99,7 +99,7 @@ class PIPAggregator:
         pdi = PreservationDescriptionInfo(
             source_system="CEO3",
             source_url=self.ceo_client.base_url,
-            harvest_timestamp=datetime.now(),
+            harvest_timestamp=datetime.now(timezone.utc),
             harvest_agent="periodical-distiller",
         )
 
@@ -169,6 +169,16 @@ class PIPAggregator:
             date_range=(start.isoformat(), end.isoformat()),
             articles=articles,
         )
+
+    def __enter__(self) -> "PIPAggregator":
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Exit context manager, closing the internally-owned MediaDownloader."""
+        if self._owns_downloader and self._media_downloader is not None:
+            self._media_downloader.close()
+        return None
 
     def _get_media_downloader(self) -> MediaDownloader:
         """Get or create the media downloader instance."""

@@ -58,16 +58,15 @@ def harvest_pip(args: argparse.Namespace) -> int:
 
     try:
         with CeoClient(config) as client:
-            aggregator = PIPAggregator(
+            with PIPAggregator(
                 output_dir, client, download_media=not args.no_media
-            )
-
-            if args.date is not None:
-                logger.info(f"Fetching articles for {args.date}")
-                manifest = aggregator.create_pip_for_date(args.date)
-            else:
-                logger.info(f"Fetching articles from {args.start} to {args.end}")
-                manifest = aggregator.create_pip_for_date_range(args.start, args.end)
+            ) as aggregator:
+                if args.date is not None:
+                    logger.info(f"Fetching articles for {args.date}")
+                    manifest = aggregator.create_pip_for_date(args.date)
+                else:
+                    logger.info(f"Fetching articles from {args.start} to {args.end}")
+                    manifest = aggregator.create_pip_for_date_range(args.start, args.end)
 
         logger.info(f"Created PIP: {manifest.id}")
         logger.info(f"  Title: {manifest.title}")

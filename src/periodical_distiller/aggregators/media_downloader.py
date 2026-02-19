@@ -297,17 +297,6 @@ class MediaDownloader:
             f"{IMGIX_BASE_URL}/pri/{uuid}.{extension}",
         ]
 
-    def _build_media_url(self, media: CeoMedia) -> str:
-        """Build the primary CDN URL for a media item.
-
-        Args:
-            media: The CeoMedia object
-
-        Returns:
-            The primary URL for downloading the media
-        """
-        return self._build_media_urls(media)[0]
-
     def _download_file(self, url: str, destination: Path) -> None:
         """Download a file from URL to local path.
 

@@ -192,3 +192,83 @@ right fix before implementing it.
   - ~PIPTransformer~: PIP→SIP transformers (e.g., HTMLTransformer)
   - ~SIPTransformer~: SIP→SIP enrichment (e.g., PDFTransformer)
   - ~Transformer~ kept as alias for backwards compatibility
+** DONE [#A] Fix bug: error trying to load image file
+CLOSED: [2026-02-19]
+:PROPERTIES:
+:CUSTOM_ID: run_pipeline.error-loading-image-file
+:ASSIGNEES: Claude
+:END:
+- Root cause :: Relative ~sip_path~ produced a malformed ~file://hostname/path~
+  URL for ~base_url~ in ~PDFTransformer._transform_article~.  WeasyPrint
+  stripped the hostname, yielding a path that didn't exist.
+- Fix :: Replace ~f"file://{article_dir}/"~ with
+  ~article_dir.resolve().as_uri() + "/"~.  ~Path.resolve()~ converts to an
+  absolute path; ~Path.as_uri()~ always emits the correct three-slash form.
+Example of failure:
+#+begin_src sh
+  ➜  periodical-distiller git:(main) pdm run python -m periodical_distiller.cli run-pipeline --pip workspace/pips/2026-01-01_to_2026-01-14
+  INFO: Seeded token 2026-01-01_to_2026-01-14 to pip_harvested
+  INFO: Transforming PIP 2026-01-01_to_2026-01-14 with 3 articles
+  INFO: Created SIP 2026-01-01_to_2026-01-14 with 3 articles
+  INFO: Transforming SIP 2026-01-01_to_2026-01-14 with 3 articles to PDF
+  ERROR: Failed to load stylesheet at file://workspace/sips/2026-01-01_to_2026-01-14/article.css: URLError: <urlopen error [Errno 2] No such file or directory: '/sips/2026-01-01_to_2026-01-14/article.css'>
+  ERROR: Failed to load image at 'file://workspace/sips/2026-01-01_to_2026-01-14/articles/73553/images/nassau-street-and-tigertransit-bus-mc-mccoy-4-15-25.jpg': URLError: <urlopen error [Errno 2] No such file or directory: '/sips/2026-01-01_to_2026-01-14/articles/73553/images/nassau-street-and-tigertransit-bus-mc-mccoy-4-15-25.jpg'>
+  ERROR: Failed to load stylesheet at file://workspace/sips/2026-01-01_to_2026-01-14/article.css: URLError: <urlopen error [Errno 2] No such file or directory: '/sips/2026-01-01_to_2026-01-14/article.css'>
+  ERROR: Failed to load image at 'file://workspace/sips/2026-01-01_to_2026-01-14/articles/73542/images/dan-weiner-hhr-7x5.png': URLError: <urlopen error [Errno 2] No such file or directory: '/sips/2026-01-01_to_2026-01-14/articles/73542/images/dan-weiner-hhr-7x5.png'>
+  ERROR: Failed to load stylesheet at file://workspace/sips/2026-01-01_to_2026-01-14/article.css: URLError: <urlopen error [Errno 2] No such file or directory: '/sips/2026-01-01_to_2026-01-14/article.css'>
+  ERROR: Failed to load image at 'file://workspace/sips/2026-01-01_to_2026-01-14/articles/73539/images/walk-near-nassau-st-fall-gheorghita-10-25-24.jpg': URLError: <urlopen error [Errno 2] No such file or directory: '/sips/2026-01-01_to_2026-01-14/articles/73539/images/walk-near-nassau-st-fall-gheorghita-10-25-24.jpg'>
+  INFO: PDF transformation complete for SIP 2026-01-01_to_2026-01-14
+  INFO: Transforming SIP 2026-01-01_to_2026-01-14 with 3 articles to ALTO
+  INFO: ALTO transformation complete for SIP 2026-01-01_to_2026-01-14
+  INFO: Transforming SIP 2026-01-01_to_2026-01-14 with 3 articles to MODS
+  INFO: MODS transformation complete for SIP 2026-01-01_to_2026-01-14
+  INFO: Transforming SIP 2026-01-01_to_2026-01-14 with 3 articles to JPEG images
+  INFO: Image transformation complete for SIP 2026-01-01_to_2026-01-14
+  INFO: Compiling Veridian SIP at workspace/sips/2026-01-01_to_2026-01-14
+  INFO: Compiling METS for SIP 2026-01-01_to_2026-01-14
+  INFO: Wrote METS to workspace/sips/2026-01-01_to_2026-01-14/mets.xml
+  INFO: SIP 2026-01-01_to_2026-01-14 sealed with METS at mets.xml
+  INFO: Pipeline complete for 2026-01-01_to_2026-01-14
+  INFO:   Status: sealed
+  INFO:   METS: mets.xml
+  INFO:   Output: workspace/sips/2026-01-01_to_2026-01-14
+#+end_src
+** DONE [#A] Fix bug: error trying to load stylesheet file
+CLOSED: [2026-02-19]
+:PROPERTIES:
+:CUSTOM_ID: run_pipeline.error-loading-stylesheet-file
+:ASSIGNEES: Claude
+:END:
+- Root cause :: Same as ~run_pipeline.error-loading-image-file~ — same malformed
+  ~base_url~ causes WeasyPrint to fail resolving the stylesheet referenced in the
+  HTML ~<link>~ tag.
+- Fix :: See ~run_pipeline.error-loading-image-file~.
+Example of failure:
+#+begin_src sh
+  ➜  periodical-distiller git:(main) pdm run python -m periodical_distiller.cli run-pipeline --pip workspace/pips/2026-01-01_to_2026-01-14
+  INFO: Seeded token 2026-01-01_to_2026-01-14 to pip_harvested
+  INFO: Transforming PIP 2026-01-01_to_2026-01-14 with 3 articles
+  INFO: Created SIP 2026-01-01_to_2026-01-14 with 3 articles
+  INFO: Transforming SIP 2026-01-01_to_2026-01-14 with 3 articles to PDF
+  ERROR: Failed to load stylesheet at file://workspace/sips/2026-01-01_to_2026-01-14/article.css: URLError: <urlopen error [Errno 2] No such file or directory: '/sips/2026-01-01_to_2026-01-14/article.css'>
+  ERROR: Failed to load image at 'file://workspace/sips/2026-01-01_to_2026-01-14/articles/73553/images/nassau-street-and-tigertransit-bus-mc-mccoy-4-15-25.jpg': URLError: <urlopen error [Errno 2] No such file or directory: '/sips/2026-01-01_to_2026-01-14/articles/73553/images/nassau-street-and-tigertransit-bus-mc-mccoy-4-15-25.jpg'>
+  ERROR: Failed to load stylesheet at file://workspace/sips/2026-01-01_to_2026-01-14/article.css: URLError: <urlopen error [Errno 2] No such file or directory: '/sips/2026-01-01_to_2026-01-14/article.css'>
+  ERROR: Failed to load image at 'file://workspace/sips/2026-01-01_to_2026-01-14/articles/73542/images/dan-weiner-hhr-7x5.png': URLError: <urlopen error [Errno 2] No such file or directory: '/sips/2026-01-01_to_2026-01-14/articles/73542/images/dan-weiner-hhr-7x5.png'>
+  ERROR: Failed to load stylesheet at file://workspace/sips/2026-01-01_to_2026-01-14/article.css: URLError: <urlopen error [Errno 2] No such file or directory: '/sips/2026-01-01_to_2026-01-14/article.css'>
+  ERROR: Failed to load image at 'file://workspace/sips/2026-01-01_to_2026-01-14/articles/73539/images/walk-near-nassau-st-fall-gheorghita-10-25-24.jpg': URLError: <urlopen error [Errno 2] No such file or directory: '/sips/2026-01-01_to_2026-01-14/articles/73539/images/walk-near-nassau-st-fall-gheorghita-10-25-24.jpg'>
+  INFO: PDF transformation complete for SIP 2026-01-01_to_2026-01-14
+  INFO: Transforming SIP 2026-01-01_to_2026-01-14 with 3 articles to ALTO
+  INFO: ALTO transformation complete for SIP 2026-01-01_to_2026-01-14
+  INFO: Transforming SIP 2026-01-01_to_2026-01-14 with 3 articles to MODS
+  INFO: MODS transformation complete for SIP 2026-01-01_to_2026-01-14
+  INFO: Transforming SIP 2026-01-01_to_2026-01-14 with 3 articles to JPEG images
+  INFO: Image transformation complete for SIP 2026-01-01_to_2026-01-14
+  INFO: Compiling Veridian SIP at workspace/sips/2026-01-01_to_2026-01-14
+  INFO: Compiling METS for SIP 2026-01-01_to_2026-01-14
+  INFO: Wrote METS to workspace/sips/2026-01-01_to_2026-01-14/mets.xml
+  INFO: SIP 2026-01-01_to_2026-01-14 sealed with METS at mets.xml
+  INFO: Pipeline complete for 2026-01-01_to_2026-01-14
+  INFO:   Status: sealed
+  INFO:   METS: mets.xml
+  INFO:   Output: workspace/sips/2026-01-01_to_2026-01-14
+#+end_src

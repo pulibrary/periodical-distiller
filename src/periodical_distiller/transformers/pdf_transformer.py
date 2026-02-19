@@ -133,7 +133,7 @@ class PDFTransformer(SIPTransformer):
         html_path = sip_path / article.html_path
         pdf_path = article_dir / "article.pdf"
 
-        base_url = self.base_url or f"file://{article_dir}/"
+        base_url = self.base_url or article_dir.resolve().as_uri() + "/"
 
         html_doc = HTML(filename=str(html_path), base_url=base_url)
 

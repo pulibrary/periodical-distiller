@@ -504,6 +504,69 @@ class TestPDFTransformerErrorHandling:
         assert (sip_dir / "articles" / "valid" / "article.pdf").exists()
 
 
+class TestPDFTransformerRelativePath:
+    """Regression test: base_url must be well-formed when sip_path is relative."""
+
+    def test_transform_with_relative_sip_path_produces_valid_pdf(
+        self, tmp_path, monkeypatch
+    ):
+        """transform() succeeds and generates a valid PDF when invoked with a relative sip_path.
+
+        WeasyPrint requires a correctly-formed file:/// URL (three slashes).  When
+        sip_path is relative, article_dir is also relative and the naive
+        f"file://{article_dir}/" construction produces "file://workspace/..." where
+        the URL parser treats the first path component as a hostname.  Using
+        Path.resolve().as_uri() always yields the three-slash absolute form.
+        """
+        # Build a real SIP under tmp_path
+        sip_dir = tmp_path / "sips" / "2026-02-19"
+        sip_dir.mkdir(parents=True)
+
+        article_dir = sip_dir / "articles" / "55555"
+        article_dir.mkdir(parents=True)
+
+        html_content = """<!DOCTYPE html>
+<html>
+<head><title>Relative Path Test</title></head>
+<body><h1>Relative Path Article</h1><p>Content.</p></body>
+</html>"""
+        (article_dir / "article.html").write_text(html_content)
+
+        manifest = SIPManifest(
+            id="2026-02-19",
+            pip_id="2026-02-19",
+            articles=[
+                SIPArticle(ceo_id="55555", html_path="articles/55555/article.html"),
+            ],
+            status="sealed",
+        )
+        (sip_dir / "sip-manifest.json").write_text(manifest.model_dump_json(indent=2))
+
+        # Change cwd to tmp_path so we can pass a relative path
+        monkeypatch.chdir(tmp_path)
+        relative_sip_path = Path("sips/2026-02-19")
+
+        transformer = PDFTransformer()
+        result = transformer.transform(relative_sip_path)
+
+        # PDF should be generated without errors
+        assert len(result.validation_errors) == 0
+        assert result.articles[0].pdf_path == "articles/55555/article.pdf"
+        pdf_path = sip_dir / "articles" / "55555" / "article.pdf"
+        assert pdf_path.exists()
+        assert pdf_path.read_bytes()[:4] == b"%PDF"
+
+    def test_article_dir_as_uri_has_three_slashes(self, tmp_path):
+        """Path.resolve().as_uri() always produces a file:/// URL with three slashes."""
+        # Absolute path (as pytest tmp_path provides) — must be three slashes
+        abs_dir = tmp_path / "articles" / "12345"
+        assert abs_dir.resolve().as_uri().startswith("file:///")
+
+        # Relative path resolved from cwd — must also be three slashes
+        rel_dir = Path("workspace/sips/2026-01-01/articles/73553")
+        assert rel_dir.resolve().as_uri().startswith("file:///")
+
+
 class TestPDFTransformerStylesheet:
     """Tests for stylesheet loading."""
 

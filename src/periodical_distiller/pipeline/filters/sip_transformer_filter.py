@@ -29,7 +29,9 @@ class SIPTransformerFilter(Filter):
         return bool(token.get_prop("sip_path"))
 
     def process_token(self, token: Token) -> bool:
-        manifest = self.transformer.transform(Path(token.get_prop("sip_path")))
+        sip_path_str = token.get_prop("sip_path")
+        assert sip_path_str is not None
+        manifest = self.transformer.transform(Path(sip_path_str))
         if manifest.validation_errors:
             token.put_prop("validation_errors", manifest.validation_errors)
         return True

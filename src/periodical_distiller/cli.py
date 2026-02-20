@@ -385,7 +385,7 @@ def run_pipeline(args: argparse.Namespace) -> int:
 
         status = token.get_prop("status") or "unknown"
         mets_path = token.get_prop("mets_path")
-        validation_errors = token.get_prop("validation_errors") or []
+        validation_errors: list[str] = token.get_prop("validation_errors") or []  # type: ignore[assignment]
 
         logger.info(f"Pipeline complete for {pip_path.name}")
         logger.info(f"  Status: {status}")
@@ -618,7 +618,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 0
 
-    return args.func(args)
+    return int(args.func(args))
 
 
 if __name__ == "__main__":

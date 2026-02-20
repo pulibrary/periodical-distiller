@@ -28,7 +28,7 @@ def _make_pdf(path: Path, pages: int = 1) -> None:
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
-def sip_with_pdf(tmp_path) -> Path:
+def sip_with_pdf(tmp_path: Path) -> Path:
     """SIP with one article, a one-page PDF, and the manifest pre-populated."""
     sip_dir = tmp_path / "sips" / "2026-01-29"
     article_dir = sip_dir / "articles" / "12345"
@@ -52,7 +52,7 @@ def sip_with_pdf(tmp_path) -> Path:
 
 
 @pytest.fixture
-def sip_with_multipage_pdf(tmp_path) -> Path:
+def sip_with_multipage_pdf(tmp_path: Path) -> Path:
     """SIP with one article containing a two-page PDF."""
     sip_dir = tmp_path / "sips" / "2026-01-30"
     article_dir = sip_dir / "articles" / "67890"
@@ -79,7 +79,7 @@ def sip_with_multipage_pdf(tmp_path) -> Path:
 
 
 @pytest.fixture
-def sip_multiple_articles(tmp_path) -> Path:
+def sip_multiple_articles(tmp_path: Path) -> Path:
     """SIP with two articles, each with a one-page PDF."""
     sip_dir = tmp_path / "sips" / "2026-01-31"
     sip_dir.mkdir(parents=True)

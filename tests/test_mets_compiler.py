@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from typing import cast
 
 import fitz  # PyMuPDF
 import pytest
@@ -55,7 +56,10 @@ def _make_mods_xml(title: str, authors: list[str]) -> bytes:
         name_el.set("type", "personal")
         name_part = etree.SubElement(name_el, f"{{{ns}}}namePart")
         name_part.text = author
-    return etree.tostring(root, xml_declaration=True, encoding="UTF-8", pretty_print=True)
+    return cast(
+        bytes,
+        etree.tostring(root, xml_declaration=True, encoding="UTF-8", pretty_print=True),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +67,7 @@ def _make_mods_xml(title: str, authors: list[str]) -> bytes:
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
-def full_sip(tmp_path) -> Path:
+def full_sip(tmp_path: Path) -> Path:
     """Fully populated SIP + PIP fixture.
 
     Structure::
@@ -137,7 +141,7 @@ def full_sip(tmp_path) -> Path:
 
 
 @pytest.fixture
-def full_sip_with_images(full_sip) -> Path:
+def full_sip_with_images(full_sip: Path) -> Path:
     """Extends full_sip with a JPEG image on the page."""
     article_dir = full_sip / "articles" / "12345"
     # Write a minimal JPEG (just the magic bytes + some padding)
@@ -157,7 +161,7 @@ def full_sip_with_images(full_sip) -> Path:
 
 
 @pytest.fixture
-def full_sip_two_articles(tmp_path) -> Path:
+def full_sip_two_articles(tmp_path: Path) -> Path:
     """SIP with two articles for multi-article tests."""
     pip_dir = tmp_path / "pips" / "2026-01-29"
     for ceo_id in ("11111", "22222"):

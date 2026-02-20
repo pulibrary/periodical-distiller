@@ -89,6 +89,7 @@ class ImageTransformer(SIPTransformer):
             sip_path: Path to the SIP directory
             article: SIPArticle with pdf_path and pages
         """
+        assert article.pdf_path is not None
         pdf_path = sip_path / article.pdf_path
         doc = fitz.open(str(pdf_path))
 

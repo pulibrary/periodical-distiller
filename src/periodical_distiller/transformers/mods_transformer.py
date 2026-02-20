@@ -52,6 +52,7 @@ class MODSTransformer(SIPTransformer):
 
         try:
             pip_articles = self._load_pip_article_map(sip_manifest)
+            assert sip_manifest.pip_path is not None
             pip_path = Path(sip_manifest.pip_path)
         except Exception as e:
             logger.error(f"Failed to load PIP for SIP {sip_manifest.id}: {e}")

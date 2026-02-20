@@ -3,6 +3,7 @@
 import logging
 from datetime import date, datetime, timezone
 from pathlib import Path
+from typing import cast
 
 from periodical_distiller.aggregators.media_downloader import MediaDownloader
 from periodical_distiller.clients import CeoClient
@@ -129,7 +130,7 @@ class PIPAggregator:
         Returns:
             The completed PIPManifest
         """
-        articles = self.ceo_client.fetch_by_date(target_date)
+        articles = cast(list[CeoItem], self.ceo_client.fetch_by_date(target_date))
         issue_id = target_date.isoformat()
         date_str = target_date.isoformat()
 
@@ -154,7 +155,7 @@ class PIPAggregator:
         Returns:
             The completed PIPManifest
         """
-        articles = self.ceo_client.fetch_by_date_range(start, end)
+        articles = cast(list[CeoItem], self.ceo_client.fetch_by_date_range(start, end))
         issue_id = f"{start.isoformat()}_to_{end.isoformat()}"
 
         title = (

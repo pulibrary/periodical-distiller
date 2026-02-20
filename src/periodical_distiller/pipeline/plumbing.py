@@ -420,7 +420,7 @@ class Pipeline:
         self.config = config
         self.buckets: dict[str, Path] = {}
         if config is not None:
-            for rec in self.config.get("buckets", []):
+            for rec in config.get("buckets", []):
                 name = rec.get("name", "")
                 location = Path(rec.get("path", "/dev/null"))
                 self.add_bucket(name, location)

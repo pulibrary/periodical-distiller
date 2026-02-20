@@ -27,7 +27,9 @@ class MetsFilter(Filter):
         return bool(token.get_prop("sip_path"))
 
     def process_token(self, token: Token) -> bool:
-        manifest = self.compiler.compile(Path(token.get_prop("sip_path")))
+        sip_path_str = token.get_prop("sip_path")
+        assert sip_path_str is not None
+        manifest = self.compiler.compile(Path(sip_path_str))
         if manifest.mets_path:
             token.put_prop("mets_path", manifest.mets_path)
         token.put_prop("status", manifest.status)

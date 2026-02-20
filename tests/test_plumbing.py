@@ -1,11 +1,10 @@
 """Tests for pipeline infrastructure."""
 
 import json
-from pathlib import Path
 
 import pytest
 
-from periodical_distiller.pipeline import Token, Pipe, Filter, Pipeline, load_token, dump_token
+from periodical_distiller.pipeline import Filter, Pipe, Pipeline, Token, dump_token, load_token
 
 
 class TestToken:

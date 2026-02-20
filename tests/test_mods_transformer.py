@@ -10,7 +10,6 @@ from periodical_distiller.transformers.mods_transformer import MODS_NS, MODSTran
 from schemas.pip import PIPArticle, PIPManifest, PreservationDescriptionInfo
 from schemas.sip import SIPArticle, SIPManifest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

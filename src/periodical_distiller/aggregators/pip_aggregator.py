@@ -1,6 +1,5 @@
 """PIP Aggregator for assembling Primary Information Packages."""
 
-import json
 import logging
 from datetime import date, datetime, timezone
 from pathlib import Path

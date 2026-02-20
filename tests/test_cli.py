@@ -1,8 +1,6 @@
 """Tests for the CLI module."""
 
-import json
 from datetime import date
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest

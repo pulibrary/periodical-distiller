@@ -1,8 +1,7 @@
 """Tests for the MediaDownloader class."""
 
 import hashlib
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import httpx
 import pytest

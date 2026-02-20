@@ -13,9 +13,8 @@ from periodical_distiller.compilers.mets_compiler import (
     METSCompiler,
 )
 from periodical_distiller.compilers.veridian_sip_compiler import VeridianSIPCompiler
-from schemas.pip import PIPManifest, PIPArticle, PreservationDescriptionInfo
+from schemas.pip import PIPArticle, PIPManifest
 from schemas.sip import SIPArticle, SIPManifest, SIPPage
-
 
 # ---------------------------------------------------------------------------
 # Helpers

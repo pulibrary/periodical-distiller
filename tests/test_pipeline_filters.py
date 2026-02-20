@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -12,12 +12,10 @@ from periodical_distiller.pipeline.filters.image_filter import ImageFilter
 from periodical_distiller.pipeline.filters.mets_filter import MetsFilter
 from periodical_distiller.pipeline.filters.mods_filter import ModsFilter
 from periodical_distiller.pipeline.filters.pdf_filter import PdfFilter
-from periodical_distiller.pipeline.filters.sip_transformer_filter import SIPTransformerFilter
 from periodical_distiller.pipeline.orchestrator import Orchestrator
-from periodical_distiller.pipeline.plumbing import Pipe, Token, dump_token, load_token
+from periodical_distiller.pipeline.plumbing import Pipe, Token
 from schemas.pip import PIPArticle, PIPManifest
-from schemas.sip import SIPArticle, SIPManifest, SIPPage
-
+from schemas.sip import SIPArticle, SIPManifest
 
 # ---------------------------------------------------------------------------
 # Helpers

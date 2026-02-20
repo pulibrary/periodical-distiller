@@ -10,7 +10,13 @@ from periodical_distiller.aggregators import PIPAggregator
 from periodical_distiller.clients import CeoClient
 from periodical_distiller.compilers import VeridianSIPCompiler
 from periodical_distiller.pipeline.orchestrator import Orchestrator
-from periodical_distiller.transformers import ALTOTransformer, HTMLTransformer, ImageTransformer, MODSTransformer, PDFTransformer
+from periodical_distiller.transformers import (
+    ALTOTransformer,
+    HTMLTransformer,
+    ImageTransformer,
+    MODSTransformer,
+    PDFTransformer,
+)
 
 DEFAULT_OUTPUT_DIR = Path("./workspace/pips")
 DEFAULT_SIP_OUTPUT_DIR = Path("./workspace/sips")

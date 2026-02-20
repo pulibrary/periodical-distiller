@@ -1,6 +1,5 @@
 """Tests for client exception classes."""
 
-import pytest
 
 from periodical_distiller.clients import (
     APIError,

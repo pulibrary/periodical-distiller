@@ -1,8 +1,6 @@
 """Pytest fixtures for Periodical Distiller tests."""
 
 import json
-from pathlib import Path
-from datetime import date
 
 import pytest
 

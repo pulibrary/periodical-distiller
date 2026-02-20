@@ -10,7 +10,6 @@ from lxml import etree
 from periodical_distiller.transformers.alto_transformer import ALTO_NS, ALTOTransformer
 from schemas.sip import SIPArticle, SIPManifest, SIPPage
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

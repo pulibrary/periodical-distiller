@@ -1,7 +1,6 @@
 """Tests for the HTML Transformer and Jinja2 filters."""
 
 import json
-from pathlib import Path
 
 import pytest
 

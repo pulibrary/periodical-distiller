@@ -4,7 +4,6 @@ Thin orchestrator that delegates METS generation to METSCompiler and
 seals the SIP manifest for Veridian ingest.
 """
 
-import json
 import logging
 from pathlib import Path
 

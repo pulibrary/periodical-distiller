@@ -9,7 +9,6 @@ import pytest
 from periodical_distiller.transformers.image_transformer import ImageTransformer
 from schemas.sip import SIPArticle, SIPManifest, SIPPage
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

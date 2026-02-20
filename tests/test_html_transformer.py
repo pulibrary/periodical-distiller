@@ -242,7 +242,12 @@ def sample_pip_structure(tmp_path):
         "hits": "100",
         "metadata": [],
         "normalized_tags": "",
-        "tags": [{"id": "1", "uuid": "t1", "name": "news", "slug": "news", "ceo_id": "1", "metadata": None}],
+        "tags": [{"id": "1",
+                  "uuid": "t1",
+                  "name": "news",
+                  "slug": "news",
+                  "ceo_id": "1",
+                  "metadata": None}],
         "authors": [
             {
                 "id": "a1",
@@ -410,7 +415,10 @@ def sample_pip_with_dominant_media(tmp_path):
             "extension": "jpg",
             "preview_extension": "jpg",
             "title": "Featured Photo",
-            "content": "<h5>View of campus from the library.</h5><h6>Jane Smith / The Daily Princetonian</h6>",
+            "content": (
+                "<h5>View of campus from the library.</h5>"
+                "<h6>Jane Smith / The Daily Princetonian</h6>"
+            ),
             "source": None,
             "click_through": None,
             "type": "image",

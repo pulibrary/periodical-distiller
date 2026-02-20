@@ -79,7 +79,7 @@ class TestMediaDownloaderContextManager:
 
     def test_context_manager_does_not_close_injected_client(self, mock_http_client):
         """Context manager does not close injected client."""
-        with MediaDownloader(http_client=mock_http_client) as downloader:
+        with MediaDownloader(http_client=mock_http_client) as _:
             pass
 
         mock_http_client.close.assert_not_called()

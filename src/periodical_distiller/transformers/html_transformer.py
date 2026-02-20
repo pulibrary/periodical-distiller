@@ -83,7 +83,9 @@ class HTMLTransformer(PIPTransformer):
             SIPManifest describing the transformed content
         """
         pip_manifest = self._load_pip_manifest(pip_path)
-        logger.info(f"Transforming PIP {pip_manifest.id} with {len(pip_manifest.articles)} articles")
+        logger.info(
+            f"Transforming PIP {pip_manifest.id} with {len(pip_manifest.articles)} articles"
+        )
 
         sip_manifest = SIPManifest(
             id=pip_manifest.id,

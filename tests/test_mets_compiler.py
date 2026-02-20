@@ -578,7 +578,10 @@ class TestMETSCompilerErrorHandling:
 
         METSCompiler().compile(sip_dir)
         root = _parse_mets(sip_dir / "mets.xml")
-        title_els = root.findall(f".//{_mods_tag('relatedItem')}/{_mods_tag('titleInfo')}/{_mods_tag('title')}")
+        title_path = (
+            f".//{_mods_tag('relatedItem')}/{_mods_tag('titleInfo')}/{_mods_tag('title')}"
+        )
+        title_els = root.findall(title_path)
         assert len(title_els) == 1
         assert "99999" in title_els[0].text
 

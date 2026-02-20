@@ -159,7 +159,8 @@ class TestCeoClientFetch:
         """fetch() raises ValidationError when data fails schema validation."""
         client = CeoClient(ceo_config)
 
-        invalid_record = {"id": "12345", "published_at": "2026-01-15 10:00:00"}  # Missing required fields
+        # Missing required fields
+        invalid_record = {"id": "12345", "published_at": "2026-01-15 10:00:00"}
 
         mock_http_client = MagicMock()
         mock_http_client.request.return_value = make_ceo_response([invalid_record])

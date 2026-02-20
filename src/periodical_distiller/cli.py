@@ -439,7 +439,7 @@ def main(argv: list[str] | None = None) -> int:
         "harvest-pip",
         parents=[verbose_parser],
         help="Fetch articles from CEO3 and create a PIP",
-        description="Fetch articles from the CEO3 API and assemble them into a Primary Information Package (PIP).",
+        description="Fetch articles from the CEO3 API and assemble them into a PIP.",
     )
     harvest_parser.add_argument(
         "--date",
@@ -479,7 +479,7 @@ def main(argv: list[str] | None = None) -> int:
         "transform-html",
         parents=[verbose_parser],
         help="Transform a PIP into a SIP with HTML files",
-        description="Transform a Primary Information Package (PIP) into a Submission Information Package (SIP) containing styled HTML articles.",
+        description="Transform a PIP into a SIP containing styled HTML articles.",
     )
     transform_parser.add_argument(
         "--pip",
@@ -499,7 +499,10 @@ def main(argv: list[str] | None = None) -> int:
         "transform-pdf",
         parents=[verbose_parser],
         help="Transform HTML files in a SIP to PDF",
-        description="Transform HTML articles in a Submission Information Package (SIP) to PDF format using WeasyPrint.",
+        description=(
+            "Transform HTML articles in a Submission Information Package (SIP)"
+            " to PDF format using WeasyPrint."
+        ),
     )
     pdf_parser.add_argument(
         "--sip",
@@ -513,7 +516,10 @@ def main(argv: list[str] | None = None) -> int:
         "transform-alto",
         parents=[verbose_parser],
         help="Generate ALTO XML files from PDFs in a SIP",
-        description="Extract word-level text from PDF articles in a Submission Information Package (SIP) and write ALTO 2.1 XML files.",
+        description=(
+            "Extract word-level text from PDF articles in a Submission Information"
+            " Package (SIP) and write ALTO 2.1 XML files."
+        ),
     )
     alto_parser.add_argument(
         "--sip",
@@ -527,7 +533,10 @@ def main(argv: list[str] | None = None) -> int:
         "transform-mods",
         parents=[verbose_parser],
         help="Generate MODS XML files from CEO3 records in a SIP",
-        description="Read CEO3 source records from the linked PIP and write MODS 3.8 XML files into a Submission Information Package (SIP).",
+        description=(
+            "Read CEO3 source records from the linked PIP and write MODS 3.8 XML"
+            " files into a Submission Information Package (SIP)."
+        ),
     )
     mods_parser.add_argument(
         "--sip",
@@ -541,7 +550,10 @@ def main(argv: list[str] | None = None) -> int:
         "transform-image",
         parents=[verbose_parser],
         help="Generate JPEG page images from PDFs in a SIP",
-        description="Rasterize PDF articles in a Submission Information Package (SIP) to JPEG images at 150 DPI.",
+        description=(
+            "Rasterize PDF articles in a Submission Information Package (SIP)"
+            " to JPEG images at 150 DPI."
+        ),
     )
     image_parser.add_argument(
         "--sip",
@@ -555,7 +567,10 @@ def main(argv: list[str] | None = None) -> int:
         "compile-sip",
         parents=[verbose_parser],
         help="Compile METS and seal a SIP for Veridian ingest",
-        description="Build a METS document from SIP and PIP manifests and seal the Submission Information Package for Veridian ingest.",
+        description=(
+            "Build a METS document from SIP and PIP manifests and seal the"
+            " Submission Information Package for Veridian ingest."
+        ),
     )
     compile_parser.add_argument(
         "--sip",
@@ -569,7 +584,10 @@ def main(argv: list[str] | None = None) -> int:
         "run-pipeline",
         parents=[verbose_parser],
         help="Run the full pipeline from PIP to sealed SIP",
-        description="Run a Primary Information Package (PIP) through the complete transformation pipeline to produce a sealed Veridian SIP.",
+        description=(
+            "Run a Primary Information Package (PIP) through the complete"
+            " transformation pipeline to produce a sealed Veridian SIP."
+        ),
     )
     pipeline_parser.add_argument(
         "--pip",
@@ -587,7 +605,10 @@ def main(argv: list[str] | None = None) -> int:
         "--workspace",
         type=Path,
         default=None,
-        help="Pipeline workspace directory for bucket state (default: <pip-parent>/pipeline-workspace/<pip-id>)",
+        help=(
+            "Pipeline workspace directory for bucket state"
+            " (default: <pip-parent>/pipeline-workspace/<pip-id>)"
+        ),
     )
     pipeline_parser.set_defaults(func=run_pipeline)
 

@@ -1,7 +1,7 @@
 """CEO API client for fetching Daily Princetonian content."""
 
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from pydantic import ValidationError as PydanticValidationError
@@ -27,7 +27,7 @@ class CeoClient(Client):
             items = client.fetch_by_date(date(2026, 1, 15))
     """
 
-    API_PATH = "/section/news.json"
+    API_PATH = "/search.json"
     DEFAULT_PER_PAGE = 100
 
     def fetch(
@@ -59,24 +59,27 @@ class CeoClient(Client):
         start_page = (offset // self.DEFAULT_PER_PAGE) + 1
         current_page = start_page
         items_remaining = limit
-        reached_older_articles = False
 
-        while not reached_older_articles:
+        while True:
             per_page = self.DEFAULT_PER_PAGE
             if limit is not None and items_remaining is not None:
                 per_page = min(items_remaining, self.DEFAULT_PER_PAGE)
 
-            params = self._build_params(per_page, current_page)
+            params = self._build_params(per_page, current_page, date_start, date_end)
             response = self.get(self.API_PATH, params=params)
             data = response.json()
 
-            articles = data.get("articles", [])
+            articles = data.get("items", [])
             if not articles:
                 break
 
             for article in articles:
-                pub_date = self._parse_published_date(article.get("published_at"))
+                if not isinstance(article, dict):
+                    continue
+                if "headline" not in article:
+                    continue
 
+                pub_date = self._parse_published_date(article.get("published_at"))
                 if pub_date == date.min:
                     logger.warning(
                         "Skipping article %s: unparseable published_at %r",
@@ -85,12 +88,10 @@ class CeoClient(Client):
                     )
                     continue
 
+                if date_start is not None and pub_date < date_start:
+                    continue
                 if date_end is not None and pub_date > date_end:
                     continue
-
-                if date_start is not None and pub_date < date_start:
-                    reached_older_articles = True
-                    break
 
                 all_items.append(article)
 
@@ -98,13 +99,14 @@ class CeoClient(Client):
                     items_remaining = limit - len(all_items)
                     if items_remaining <= 0:
                         all_items = all_items[:limit]
-                        reached_older_articles = True
                         break
-
-            current_page += 1
-            pagination = data.get("pagination", {})
-            if current_page > pagination.get("last", current_page):
-                break
+            else:
+                current_page += 1
+                pagination = data.get("pagination", {})
+                if current_page > pagination.get("last", current_page):
+                    break
+                continue
+            break
 
         if validate:
             return self._validate_items(all_items)
@@ -165,17 +167,33 @@ class CeoClient(Client):
         self,
         per_page: int,
         page: int,
+        date_start: date | None = None,
+        date_end: date | None = None,
     ) -> dict[str, Any]:
-        """Build query parameters for the CEO API section request.
+        """Build query parameters for the CEO search API request.
 
-        The section API uses:
+        The search API uses:
+        - a=1: Enable advanced search mode
         - page: Page number (1-indexed)
         - perPage: Items per page
+        - ts_month/ts_day/ts_year: Start date filter
+        - te_month/te_day/te_year: End date filter
         """
-        return {
+        params: dict[str, Any] = {
+            "a": 1,
             "page": page,
             "perPage": per_page,
         }
+        if date_start is not None:
+            params["ts_month"] = f"{date_start.month:02d}"
+            params["ts_day"] = f"{date_start.day:02d}"
+            params["ts_year"] = date_start.year
+        if date_end is not None:
+            exclusive_end = date_end + timedelta(days=1)
+            params["te_month"] = f"{exclusive_end.month:02d}"
+            params["te_day"] = f"{exclusive_end.day:02d}"
+            params["te_year"] = exclusive_end.year
+        return params
 
     def _validate_items(self, items: list[dict[str, Any]]) -> list[CeoItem]:
         """Validate a list of items against the CeoItem schema.

@@ -1,5 +1,7 @@
 """CEO3 content item schemas."""
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -18,7 +20,7 @@ class CeoTag(BaseModel):
     name: str
     slug: str
     ceo_id: str
-    metadata: None = None
+    metadata: Any = None
 
 
 class CeoAuthor(BaseModel):
@@ -33,7 +35,7 @@ class CeoAuthor(BaseModel):
     tagline: str
     ceo_id: str
     status: str
-    metadata: None = None
+    metadata: Any = None
 
 
 class CeoMedia(BaseModel):

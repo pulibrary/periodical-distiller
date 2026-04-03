@@ -14,7 +14,7 @@ def make_ceo_response(articles, last_page=1, current_page=1):
     response = MagicMock()
     response.is_success = True
     response.json.return_value = {
-        "articles": articles,
+        "items": articles,
         "pagination": {
             "first": 1,
             "last": last_page,
@@ -69,13 +69,8 @@ class TestCeoClientFetch:
         assert items[0].headline == "Test Article Headline"
 
     def test_fetch_with_date_start_filters_articles(self, ceo_config, sample_ceo_record):
-        """fetch() filters articles by date_start."""
+        """fetch() passes date_start to the API and returns only matching articles."""
         client = CeoClient(ceo_config)
-
-        old_record = sample_ceo_record.copy()
-        old_record["id"] = "111"
-        old_record["ceo_id"] = "111"
-        old_record["published_at"] = "2026-01-10 10:00:00"
 
         new_record = sample_ceo_record.copy()
         new_record["id"] = "222"
@@ -83,16 +78,20 @@ class TestCeoClientFetch:
         new_record["published_at"] = "2026-01-20 10:00:00"
 
         mock_http_client = MagicMock()
-        mock_http_client.request.return_value = make_ceo_response([new_record, old_record])
+        mock_http_client.request.return_value = make_ceo_response([new_record])
         client._client = mock_http_client
 
         items = client.fetch(date_start=date(2026, 1, 15))
 
         assert len(items) == 1
         assert items[0].id == "222"
+        call_params = mock_http_client.request.call_args.kwargs["params"]
+        assert call_params["ts_year"] == 2026
+        assert call_params["ts_month"] == "01"
+        assert call_params["ts_day"] == "15"
 
     def test_fetch_with_date_end_filters_articles(self, ceo_config, sample_ceo_record):
-        """fetch() filters articles by date_end."""
+        """fetch() passes date_end to the API and returns only matching articles."""
         client = CeoClient(ceo_config)
 
         old_record = sample_ceo_record.copy()
@@ -100,19 +99,18 @@ class TestCeoClientFetch:
         old_record["ceo_id"] = "111"
         old_record["published_at"] = "2026-01-10 10:00:00"
 
-        new_record = sample_ceo_record.copy()
-        new_record["id"] = "222"
-        new_record["ceo_id"] = "222"
-        new_record["published_at"] = "2026-01-20 10:00:00"
-
         mock_http_client = MagicMock()
-        mock_http_client.request.return_value = make_ceo_response([new_record, old_record])
+        mock_http_client.request.return_value = make_ceo_response([old_record])
         client._client = mock_http_client
 
         items = client.fetch(date_end=date(2026, 1, 15))
 
         assert len(items) == 1
         assert items[0].id == "111"
+        call_params = mock_http_client.request.call_args.kwargs["params"]
+        assert call_params["te_year"] == 2026
+        assert call_params["te_month"] == "01"
+        assert call_params["te_day"] == "16"
 
     def test_fetch_with_limit(self, ceo_config, mock_ceo_response_multiple):
         """fetch() respects limit parameter."""
@@ -159,8 +157,8 @@ class TestCeoClientFetch:
         """fetch() raises ValidationError when data fails schema validation."""
         client = CeoClient(ceo_config)
 
-        # Missing required fields
-        invalid_record = {"id": "12345", "published_at": "2026-01-15 10:00:00"}
+        # Missing required fields (has headline so it passes the article filter)
+        invalid_record = {"id": "12345", "headline": "Bad Article", "published_at": "2026-01-15 10:00:00"}
 
         mock_http_client = MagicMock()
         mock_http_client.request.return_value = make_ceo_response([invalid_record])

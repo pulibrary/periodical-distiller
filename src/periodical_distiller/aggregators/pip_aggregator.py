@@ -115,9 +115,10 @@ class PIPAggregator:
         manifest_path = pip_dir / "pip-manifest.json"
         manifest_path.write_text(manifest.model_dump_json(indent=2))
 
-        logger.info(
-            f"Created PIP {issue_id} with {len(pip_articles)} articles at {pip_dir}"
-        )
+        if pip_articles:
+            logger.info(
+                f"Created PIP {issue_id} with {len(pip_articles)} articles at {pip_dir}"
+            )
 
         return manifest
 

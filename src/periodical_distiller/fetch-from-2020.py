@@ -1,6 +1,7 @@
 """Harvest daily PIPs from 2020-01-01 to today."""
 
 import logging
+import shutil
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -46,6 +47,12 @@ def main() -> int:
 
                 try:
                     manifest = aggregator.create_pip_for_date(current)
+                    if not manifest.articles:
+                        logger.info(f"[{succeeded + skipped + len(failed) + 1}/{total_days}] {current}: no content, skipping")
+                        shutil.rmtree(pip_dir)
+                        skipped += 1
+                        current += timedelta(days=1)
+                        continue
                     logger.info(
                         f"[{succeeded + skipped + len(failed) + 1}/{total_days}]"
                         f" {current}: {len(manifest.articles)} articles → {manifest.id}"

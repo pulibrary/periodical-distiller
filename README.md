@@ -5,6 +5,23 @@ METS/ALTO packages (MAPs) suitable for ingest into the
 [Veridian](https://veridiansoftware.com/services/presentation-software)
 presentation software system.
 
+## Installation
+
+**Prerequisites**
+
+- pdm https://pdm-project.org
+
+To install periodical-distiller, clone this repository and
+then run `pdm install`:
+
+
+```sh
+git clone https://github.com/pulibrary/periodical-distiller.git periodical-distiller
+cd periodical-distiller
+pdm install
+```
+
+
 ## Background
 
 The initial use case is the [Daily Princetonian](https://www.dailyprincetonian.com/),

@@ -59,8 +59,9 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Claude Code local settings (user-specific; not for version control)
+# Claude Code local settings and memory (user-specific; not for version control)
 .claude/settings.local.json
+memory/
 
 # Project specific
 resources/schemas/*.xsd

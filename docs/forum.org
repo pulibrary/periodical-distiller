@@ -1,0 +1,800 @@
+# -*- lexical-binding: t; -*-
+#+TITLE: Periodical Distiller Forum
+#+DATE: <2026-02-19 Thu>
+#+AUTHOR: Cliff Wulfman
+
+This is the deliberative record for the Periodical Distiller project,
+shared among Cliff, Claude Chat, and Claude Code.  Follow the protocol
+in =.claude/collaboration-protocol.org=.
+
+* Code Review — 2026-02-19
+Items surfaced by a full module-by-module review before the next phase
+of work.  Priorities: =[#A]= fix before adding features, =[#B]= fix
+soon, =[#C]= eventually.
+
+** Schemas
+
+*** DONE [#B] ~ConnectionError~ in exceptions.py shadows Python builtin
+:PROPERTIES:
+:CUSTOM_ID: review/exceptions-shadows-builtin
+:ASSIGNEES: Cliff, Claude Code
+:SOURCE: review/2026-02-19
+:DISPOSITION: fix now
+:COMMIT: ca137b1
+:END:
+~from .exceptions import ConnectionError~ in ~client.py~ shadows the Python
+builtin ~ConnectionError~.  Low-risk now but could cause subtle bugs if
+builtin exception handling ever needs to co-exist.
+
+**** Analysis
+The shadow is real and confirmed: ~clients/exceptions.py~ line 12 defines
+~class ConnectionError(ClientError)~, and ~client.py~ imports it with
+~from .exceptions import ConnectionError~.  The builtin ~ConnectionError~
+(a subclass of ~OSError~) is commonly caught by generic library and stdlib
+code, so any caller that does ~except ConnectionError:~ expecting the
+builtin will instead catch the custom one if the import is in scope.
+
+The rename is mechanical — find/replace the class name and all ~raise~
+sites — and carries no design tradeoff.
+
+Open questions:
+- Preferred name: ~ClientConnectionError~ (matches the ~ClientError~ base)
+  or ~NetworkConnectionError~ (emphasises the failure category)?
+
+**** Decision
+[2026-02-19] ~ClientConnectionError~: makes it easier to see what module
+to investigate.
+
+*** DONE [#C] ~PreservationDescriptionInfo.harvest_timestamp~ uses local time
+:PROPERTIES:
+:CUSTOM_ID: review/pdi-harvest-timestamp-timezone
+:ASSIGNEES: Cliff, Claude Code
+:SOURCE: review/2026-02-19
+:DISPOSITION: fix now
+:COMMIT: ca137b1
+:END:
+~harvest_timestamp: datetime = Field(default_factory=datetime.now)~ captures
+local wall-clock time without timezone info.  OAIS preservation metadata
+should record UTC timestamps.
+
+**** Analysis
+Confirmed in ~pip.py~ line 71.  The fix is one line plus one import.  The
+timestamp is recorded for human provenance, not for datetime arithmetic, so
+there is no risk of breaking downstream comparisons — but a naive local
+timestamp in an archival record is quietly wrong for anyone in a non-UTC
+timezone or when the server clock is ambiguous (e.g., DST transitions).
+
+One optional follow-up: add a Pydantic validator that rejects a naive
+(timezone-unaware) ~datetime~ if the field is ever set explicitly by a
+caller rather than via the default factory.
+
+Open questions:
+- Do we want the optional validator, or is the factory change sufficient?
+
+**** Decision
+[2026-02-19] Make the immediate fix now, and add a level =[#C]= TODO to add
+the Pydantic validator later.
+
+*** TODO [#C] Add Pydantic validator rejecting naive ~harvest_timestamp~
+:PROPERTIES:
+:CUSTOM_ID: review/pdi-harvest-timestamp-validator
+:ASSIGNEES: Claude Code
+:SOURCE: review/2026-02-19
+:DISPOSITION: defer
+:END:
+Follow-up to ~review/pdi-harvest-timestamp-timezone~.  After the default
+factory is fixed to emit UTC-aware datetimes, add a ~field_validator~ on
+~PreservationDescriptionInfo.harvest_timestamp~ that raises ~ValueError~ if
+a caller passes a naive (timezone-unaware) ~datetime~ directly.
+
+*** DONE [#C] Domain objects in ~src/schemas/~ may be dead code
+:PROPERTIES:
+:CUSTOM_ID: review/dead-domain-objects
+:ASSIGNEES: Cliff, Claude Code
+:SOURCE: review/2026-02-19
+:DISPOSITION: document
+:COMMIT: ca137b1
+:END:
+~article.py~, ~issue.py~, and ~page.py~ define dataclass domain objects
+(~Article~, ~Issue~, ~Page~).  The actual transformer pipeline works directly
+with Pydantic schemas (~SIPArticle~, ~SIPPage~) and never instantiates these
+dataclasses.
+
+**** Analysis
+Confirmed: ~src/schemas/__init__.py~ exports ~Article~, ~Issue~, ~Page~
+(from ~article.py~, ~issue.py~, ~page.py~), but a project-wide grep finds
+no imports of these names outside the ~src/schemas/~ directory itself.
+The active pipeline uses ~SIPArticle~ / ~SIPPage~ (Pydantic, in ~sip.py~)
+and ~ArticleTokenContent~ / ~IssueTokenContent~ (Pydantic token schemas).
+The dataclass domain objects predate the Pydantic-based design and were
+never wired into any transformer or compiler.
+
+The CLAUDE.md mentions "Project Strawberry" (generalising beyond CEO3) as a
+secondary goal, so there is a plausible future use — but the objects as
+written are CEO3-agnostic dataclasses with no behaviour, which makes them
+easy to recreate if ever needed.
+
+Open questions:
+- Are these objects part of a planned future design, or are they genuine
+  leftovers?
+
+**** Decision
+[2026-02-19] Project Strawberry is a larger-scale project to process
+periodicals into SIPs; the domain categories come from there.  Add the
+docstring: "Reserved for Project Strawberry; not yet used."
+
+*** DONE [#C] ~IssueTokenContent.articles~ is untyped ~list[dict]~
+:PROPERTIES:
+:CUSTOM_ID: review/issue-token-articles-untyped
+:ASSIGNEES: Cliff, Claude Code
+:SOURCE: review/2026-02-19
+:DISPOSITION: fix now
+:COMMIT: ca137b1
+:END:
+~articles: list[dict] = []~ carries no schema guarantee.  Consider using
+~list[ArticleTokenContent]~ for type safety across pipeline stages.
+
+**** Analysis
+Confirmed in ~src/schemas/tokens/issue_token.py~ line 30.
+~ArticleTokenContent~ already exists in ~schemas/tokens/article_token.py~
+and is the natural type for this field.  A grep finds no code currently
+writing to ~IssueTokenContent.articles~ (the issue-assembly pipeline has
+not been built yet), so this is a safe annotation-only change with no
+runtime impact today.
+
+** Clients
+
+*** DONE [#B] ~_parse_published_date~ returning ~date.min~ can cause early pagination stop
+:PROPERTIES:
+:CUSTOM_ID: review/ceo-client-date-min-bug
+:ASSIGNEES: Cliff, Claude Code
+:SOURCE: review/2026-02-19
+:DISPOSITION: fix now
+:COMMIT: 4a8a257
+:END:
+When an article has ~published_at = None~ or an unparseable timestamp,
+~_parse_published_date~ returns ~date.min~.  In the ~fetch~ loop,
+~date.min < date_start~ is always true, so ~reached_older_articles = True~
+fires immediately, silently truncating the result set.
+
+**** Analysis
+Confirmed bug.  In ~ceo_client.py~ lines 74–82: the loop calls
+~_parse_published_date~ (which returns ~date.min~ for ~None~ or unparseable
+values), then immediately evaluates ~if date_start is not None and pub_date
+< date_start~ — which is always ~True~ for ~date.min~, so it sets
+~reached_older_articles = True~ and ~break~s.
+
+The fix: before the date-range checks, insert:
+#+begin_example
+if pub_date == date.min:
+    logger.warning("Skipping article %s: unparseable published_at", article.get("id"))
+    continue
+#+end_example
+The companion test gap (see ~review/test-gap-ceo-client-date~) should be
+fixed in the same PR.
+
+**** Decision
+[2026-02-19] Fix and test together.
+
+*** TODO [#C] No retry on transient 5xx responses
+:PROPERTIES:
+:CUSTOM_ID: review/client-no-5xx-retry
+:ASSIGNEES: Cliff
+:SOURCE: review/2026-02-19
+:DISPOSITION: defer
+:END:
+~Client._request~ only retries on ~httpx.ConnectError~ and
+~httpx.TimeoutException~.  A 503 Service Unavailable (which is transient)
+causes an ~APIError~ with no retry.
+
+**** Analysis
+Confirmed in ~client.py~ lines 136–153.  Two separable improvements:
+
+1. *Retry on 5xx*: catch ~APIError~ inside the loop when ~e.status_code >= 500~.
+   No config flag strictly necessary — 5xx is always transient for GETs.
+2. *Exponential backoff*: replace ~sleep(self.retry_delay)~ with
+   ~sleep(self.retry_delay * 2 ** attempt)~.  Strictly an enhancement.
+
+Open questions:
+- Do you want both changes together, or just the 5xx retry for now?
+- Config flag for 5xx retry, or always-on?
+
+**** Decision
+[2026-02-19] Defer.  The pipeline currently runs in batch mode where a
+single 503 would be re-run manually anyway.
+
+** Aggregators
+
+*** DONE [#B] ~MediaDownloader~ created by ~PIPAggregator~ is never closed
+:PROPERTIES:
+:CUSTOM_ID: review/media-downloader-resource-leak
+:ASSIGNEES: Cliff, Claude Code
+:SOURCE: review/2026-02-19
+:DISPOSITION: fix now
+:COMMIT: c9eced4
+:END:
+When ~download_media=True~ and no ~media_downloader~ is injected,
+~_get_media_downloader~ creates a ~MediaDownloader~ internally.  The downloader
+(and its internal ~httpx.Client~) is never closed.
+
+**** Analysis
+Confirmed.  ~pip_aggregator.py~ line 48 records ~self._owns_downloader~ but
+the flag is never consulted again — there is no ~__exit__~ or explicit
+~close()~ call.  The internal ~httpx.Client~ inside the downloader leaks its
+connection pool for the lifetime of the process.
+
+The context-manager approach is cleaner:
+#+begin_example
+def __enter__(self): return self
+
+def __exit__(self, exc_type, exc_val, exc_tb):
+    if self._owns_downloader and self._media_downloader is not None:
+        self._media_downloader.close()
+    return False
+#+end_example
+This mirrors how ~CeoClient~ already works.
+
+Side-note: ~pip_aggregator.py~ line 102 also calls ~datetime.now()~ (naive
+local time) when constructing ~PreservationDescriptionInfo~.  The fix for
+~review/pdi-harvest-timestamp-timezone~ must cover this call site too.
+
+**** Decision
+[2026-02-19] Use the context-manager approach.
+
+*** DONE [#C] ~MediaDownloader._build_media_url~ (singular) is dead code
+:PROPERTIES:
+:CUSTOM_ID: review/media-downloader-dead-method
+:ASSIGNEES: Cliff, Claude Code
+:SOURCE: review/2026-02-19
+:DISPOSITION: fix now
+:COMMIT: c9eced4
+:END:
+~_build_media_url~ at line ~300~ simply delegates to ~_build_media_urls()[0]~.
+It is not called anywhere.
+
+**** Analysis
+Confirmed.  A project-wide search finds no call sites outside the class
+itself.  The plural ~_build_media_urls~ already exists and is called directly
+by ~_download_dominant_media~, so the singular wrapper serves no purpose.
+Deletion is safe and unambiguous.
+
+**** Decision
+[2026-02-19] Remove the method.
+
+** Transformers
+
+*** DONE [#B] ~PACKAGE_ROOT~ computed via four ~.parent~ calls — fragile
+:PROPERTIES:
+:CUSTOM_ID: review/package-root-fragile
+:ASSIGNEES: Cliff, Claude Code
+:SOURCE: review/2026-02-19
+:DISPOSITION: add comment
+:COMMIT: 16415bf
+:END:
+~PACKAGE_ROOT = Path(__file__).parent.parent.parent.parent~ in
+~html_transformer.py~ and ~pdf_transformer.py~ silently breaks if the file
+is ever moved.
+
+**** Analysis
+Confirmed in ~html_transformer.py~ line 25 and ~pdf_transformer.py~.  The
+chain resolves as:
+#+begin_example
+html_transformer.py
+  → transformers/
+  → periodical_distiller/
+  → src/
+  → {project root}        ← PACKAGE_ROOT
+#+end_example
+Three approaches in order of increasing robustness: (1) add a comment,
+(2) use ~importlib.resources~ (requires moving ~resources/~ into the
+package), (3) constructor injection only.
+
+Open questions:
+- Is this codebase ever expected to be installed as a library?
+
+**** Decision
+[2026-02-19] Add the comment for now; also create a TODO to decide on
+library vs. checkout-only distribution before the package grows further.
+
+*** TODO [#C] Decide: run-from-checkout vs. installable library
+:PROPERTIES:
+:CUSTOM_ID: review/library-distribution-decision
+:ASSIGNEES: Cliff
+:SOURCE: review/2026-02-19
+:DISPOSITION: defer
+:END:
+~PACKAGE_ROOT~ in transformers is anchored via four ~.parent~ calls; the
+comment fix (see ~review/package-root-fragile~) is sufficient for a
+run-from-checkout workflow, but an installable library would require moving
+~resources/~ inside the package and using ~importlib.resources~.
+
+Make an explicit decision about the distribution model before the package
+grows further.  Options:
+1. *Checkout-only* — document the assumption, keep resources at the project root.
+2. *Installable library* — move ~resources/~ to ~src/periodical_distiller/resources/~,
+   declare package data in ~pyproject.toml~, switch to ~importlib.resources~.
+
+*** DONE [#C] Image DPI (150) is below archival standard
+:PROPERTIES:
+:CUSTOM_ID: review/image-dpi-too-low
+:ASSIGNEES: Cliff, Claude Code
+:SOURCE: review/2026-02-19
+:DISPOSITION: make configurable
+:COMMIT: 16415bf
+:END:
+~ImageTransformer~ rasterises pages at 150 DPI (~fitz.Matrix(150/72, 150/72)~).
+Typical archival standards for text images are 300–400 DPI.
+
+**** Analysis
+Confirmed in ~image_transformer.py~ line 96.  Two separable sub-questions:
+1. What does Veridian require?  If it mandates ≥ 300 DPI, 150 is a
+   correctness bug.
+2. Should DPI be configurable regardless?  Making it a constructor parameter
+   (~dpi: int = 150~) is a two-line change and good practice independently.
+
+**** Decision
+[2026-02-19] Make DPI configurable now; confirm Veridian requirement
+separately.
+
+*** DONE [#C] ~_copy_article_media~ return value is unused
+:PROPERTIES:
+:CUSTOM_ID: review/copy-article-media-return-unused
+:ASSIGNEES: Cliff, Claude Code
+:SOURCE: review/2026-02-19
+:DISPOSITION: fix now
+:COMMIT: 16415bf
+:END:
+~HTMLTransformer._copy_article_media~ returns ~list[str]~ (copied paths),
+but the caller discards it.  The variable ~copied_media~ is assigned but
+never read.
+
+**** Analysis
+Confirmed in ~html_transformer.py~ lines 165–167.  ~SIPArticle~ has no field
+for copied media paths, so storing the return value would require a schema
+change.  Simpler fix: change the method's return type to ~None~, drop the
+~return copied~ statement, and drop the assignment at the call site.
+
+**** Decision
+[2026-02-19] Change to ~None~ return.
+
+*** DONE [#C] ~_transform_article~ parameter ~pip_article~ is untyped
+:PROPERTIES:
+:CUSTOM_ID: review/html-transformer-untyped-param
+:ASSIGNEES: Cliff, Claude Code
+:SOURCE: review/2026-02-19
+:DISPOSITION: fix now
+:COMMIT: 16415bf
+:END:
+~HTMLTransformer._transform_article(self, pip_path, pip_article, sip_path,
+template)~ — ~pip_article~ has no type annotation.  Should be ~PIPArticle~.
+
+**** Analysis
+Three untyped parameters across two methods in ~html_transformer.py~:
+- ~_transform_article~ line 138: ~pip_article~ (should be ~PIPArticle~)
+- ~_transform_article~ line 139: ~template~ (should be ~jinja2.Template~)
+- ~_copy_article_media~ line 199: ~pip_article~ (should be ~PIPArticle~)
+
+And one in ~image_transformer.py~:
+- ~_transform_article~ line 76: ~article~ (should be ~SIPArticle~)
+
+All four are trivial to fix in a single pass.
+
+**** Decision
+[2026-02-19] Fix all four in one pass.
+
+** Compilers
+
+*** TODO [#B] ~file://./{path}~ in METS FLocat hrefs is non-standard
+:PROPERTIES:
+:CUSTOM_ID: review/mets-file-uri-format
+:ASSIGNEES: Cliff
+:SOURCE: review/2026-02-19
+:DISPOSITION: defer
+:END:
+~METSCompiler~ emits ~file://./{page.image_path}~ for file locations.
+The ~file://./~ form is non-standard; relative paths should omit the
+scheme entirely.
+
+**** Analysis
+Confirmed.  ~mets_compiler.py~ emits ~file://./~ in four places (lines 240,
+255, 269, 283).  RFC 8089 defines ~file://~ URIs as ~file://[authority]/path~;
+a dot is not a valid authority component.
+
+The conformant alternative is a plain relative path:
+~articles/73553/001.jpg~.  Blue Mountain METS packages (the reference model
+for this project) use relative paths without a ~file://~ prefix.  Option 1
+is almost certainly what Veridian expects.
+
+Open questions:
+- Can you confirm with Veridian / check a reference Blue Mountain package
+  that relative hrefs (no scheme) are the expected format?
+
+**** Decision
+[2026-02-19] Confirm with Veridian; defer for now.
+
+*** TODO [#C] No ~CHECKSUM~ attributes on METS ~file~ elements
+:PROPERTIES:
+:CUSTOM_ID: review/mets-no-checksums
+:ASSIGNEES: Cliff
+:SOURCE: review/2026-02-19
+:DISPOSITION: defer
+:END:
+METS best practice includes ~CHECKSUM~ and ~CHECKSUMTYPE~ attributes on ~file~
+elements for integrity verification.  The PIP manifest already captures
+SHA-256 checksums for downloaded media.
+
+**** Analysis
+Checksums are available for images (~PIPMedia.checksum~) but not for ALTO,
+PDF, or MODS (generated files).  Full coverage would require computing
+~hashlib.sha256()~ at compile time — straightforward but adds I/O.
+
+Open questions:
+- Does Veridian's ingest spec require ~CHECKSUM~ attributes?
+
+**** Decision
+[2026-02-19] We're not using METS as a preservation format (its original
+intent), so the checksum is probably superfluous.  Confirm with Veridian;
+defer for now.
+
+** Pipeline
+
+*** DONE [#B] ~Filter.process_token~ / ~validate_token~ should be ~@abstractmethod~
+:PROPERTIES:
+:CUSTOM_ID: review/filter-not-abstract
+:ASSIGNEES: Cliff, Claude Code
+:SOURCE: review/2026-02-19
+:DISPOSITION: use ABC
+:COMMIT: f7e49b5
+:END:
+~plumbing.Filter~ uses ~raise NotImplementedError~ instead of ABC abstract
+methods.  A subclass that omits ~process_token~ will only fail at runtime
+when a token is processed, not at class definition time.
+
+**** Analysis
+Confirmed in ~plumbing.py~ lines 382–408.  With ~@abstractmethod~, a
+forgotten override is caught at the first instantiation of the subclass.
+
+The ~SIPTransformerFilter~ refactor (see ~review/filter-duplication~) should
+happen first (or simultaneously), since once the base class is ABC, all
+four concrete filters must still satisfy the abstract interface.
+
+**** Decision
+[2026-02-19] The pipeline code was ported rather bluntly from another
+codebase.  Refactoring now is a good idea.
+
+*** DONE [#B] ~Pipe.out_path~ / ~marked_path~ / ~error_path~ guard on wrong variable
+:PROPERTIES:
+:CUSTOM_ID: review/pipe-method-guard-bug
+:ASSIGNEES: Cliff, Claude Code
+:SOURCE: review/2026-02-19
+:DISPOSITION: fix now
+:COMMIT: f7e49b5
+:END:
+~Pipe.out_path(token)~, ~marked_path(token)~, and ~error_path(token)~ check
+~if self.token and self.token.name~ but compute their path from the ~token~
+argument.  The guard should check the argument, not the instance variable.
+
+**** Analysis
+Confirmed in ~plumbing.py~ lines 126–142.  The bug is currently latent —
+~self.token~ is always set when these methods are called — but it's a
+logical error that could bite during refactoring.  Fix is three identical
+one-line changes.
+
+**** Decision
+[2026-02-19] Fix now.
+
+*** DONE [#C] Individual pipeline filters have significant code duplication
+:PROPERTIES:
+:CUSTOM_ID: review/filter-duplication
+:ASSIGNEES: Cliff, Claude Code
+:SOURCE: review/2026-02-19
+:DISPOSITION: refactor
+:COMMIT: f7e49b5
+:END:
+~PdfFilter~, ~AltoFilter~, ~ModsFilter~, ~ImageFilter~ all follow the identical
+pattern: validate ~sip_path~ exists, call transformer, propagate
+~validation_errors~.  Only the transformer call and the token field differ.
+
+**** Decision
+[2026-02-19] Introduce a ~SIPTransformerFilter~ base class parameterised by
+a ~SIPTransformer~ instance that handles the boilerplate, leaving only
+field-specific logic in subclasses.
+
+*** DONE [#C] ~_find_token~ import inside method body
+:PROPERTIES:
+:CUSTOM_ID: review/orchestrator-inline-import
+:ASSIGNEES: Cliff, Claude Code
+:SOURCE: review/2026-02-19
+:DISPOSITION: remove inline import
+:COMMIT: f7e49b5
+:END:
+~Orchestrator._find_token~ has ~from periodical_distiller.pipeline.plumbing
+import load_token~ inside the method body (line 139).  ~load_token~ is
+already imported at the top of the file.
+
+**** Decision
+[2026-02-19] Remove the inline import; it's redundant.
+
+** CLI
+
+*** DONE [#B] ~--verbose~ only works before the subcommand name
+:PROPERTIES:
+:CUSTOM_ID: review/cli-verbose-placement
+:ASSIGNEES: Cliff, Claude Code
+:SOURCE: review/2026-02-19
+:DISPOSITION: fix now
+:COMMIT: 080e775
+:END:
+~-v~ / ~--verbose~ is defined on the top-level parser only.  It works as
+~cli.py -v transform-pdf~ but not as ~cli.py transform-pdf -v~.
+
+**** Analysis
+Confirmed.  ~cli.py~ lines 416–420 add ~-v~ / ~--verbose~ to the top-level
+parser only.  All 7 subparsers call ~setup_logging(args.verbose)~ but
+none defines the argument.
+
+The idiomatic fix is a shared parent parser:
+#+begin_example
+verbose_parser = argparse.ArgumentParser(add_help=False)
+verbose_parser.add_argument("-v", "--verbose", action="store_true",
+                            help="Enable verbose output")
+
+harvest_parser = subparsers.add_parser(
+    "harvest-pip", parents=[verbose_parser], ...
+)
+#+end_example
+
+Open questions:
+- Keep the top-level ~-v~ for backwards compatibility, or remove it?
+
+**** Decision
+[2026-02-19] Eventually upgrade the CLI to Click or Typer, but for now
+remove the top-level verbose flag and standardise on the subcommand level.
+
+** Test Coverage Gaps
+
+*** DONE [#C] ~plumbing.py~ base classes lack unit tests
+:PROPERTIES:
+:CUSTOM_ID: review/test-gap-plumbing
+:ASSIGNEES: Cliff, Claude Code
+:SOURCE: review/2026-02-19
+:DISPOSITION: fix now
+:COMMIT: 098e9c2
+:END:
+~Filter.run_once~, ~run_forever~, ~_recover_orphaned_tokens~, and
+~Pipeline.snapshot~ are tested indirectly through orchestrator tests but
+have no dedicated unit tests.
+
+**** Analysis
+Specific gaps:
+- ~_recover_orphaned_tokens~: no test seeds a ~.bak~ file and verifies
+  recovery.  This is safety-critical behavior.
+- ~Pipeline.snapshot~: never tested.
+- ~Filter.run_forever~ and signal handling: hard to unit-test
+  deterministically; skipping is reasonable.
+- ~Filter.run_once~ base behavior: implicitly covered by filter subclass tests.
+
+Priority: ~_recover_orphaned_tokens~ is the most valuable gap to close.
+
+**** Decision
+[2026-02-19] Fix ~_recover_orphaned_tokens~ and ~snapshot~; skip
+~run_forever~ signal tests as impractical.
+
+*** DONE [#C] Individual pipeline filters are not unit-tested
+:PROPERTIES:
+:CUSTOM_ID: review/test-gap-filters
+:ASSIGNEES: Cliff, Claude Code
+:SOURCE: review/2026-02-19
+:DISPOSITION: fix now
+:COMMIT: 098e9c2
+:END:
+~test_pipeline_filters.py~ may only cover happy-path scenarios.  Token
+validation failures and per-filter edge cases likely not covered.
+
+**** Analysis
+After reading ~test_pipeline_filters.py~ in full: each SIP filter class
+already has happy-path, missing ~sip_path~ → ~.err~, and transformer
+exception → ~.err~ tests.  The one gap: ~validation_errors~ propagation.
+~HtmlFilter~ has ~test_validation_errors_stored_on_token~ but the four SIP
+transformer filters do not.
+
+Open questions:
+- Add four simple tests now, or wait for the ~SIPTransformerFilter~ refactor
+  to write one parameterised test?
+
+**** Decision
+[2026-02-19] Fix now; can write four simple tests immediately, or defer
+the parameterised version to after the refactor — either is fine.
+
+*** DONE [#C] ~_parse_published_date~ edge cases not tested
+:PROPERTIES:
+:CUSTOM_ID: review/test-gap-ceo-client-date
+:ASSIGNEES: Cliff, Claude Code
+:SOURCE: review/2026-02-19
+:DISPOSITION: fix now
+:COMMIT: 4a8a257
+:END:
+The ~date.min~ truncation bug (see ~review/ceo-client-date-min-bug~) is not
+exercised by tests.  Add a test with an article that has ~published_at = None~
+mid-page to confirm it does not stop pagination.
+
+**** Analysis
+Coupled to the fix for ~review/ceo-client-date-min-bug~ — should live in
+the same PR.  Test scenario: two pages of API results where a ~None~
+~published_at~ article appears on the first page between two valid articles.
+With the fix in place, assert all three valid articles are returned, a
+warning is logged for the skipped article, and pagination continues.
+
+**** Decision
+[2026-02-19] Bundle with the bug fix.
+
+* Ad Hoc
+
+*** TODO [#C] Consider adding lxml type stubs
+:PROPERTIES:
+:CUSTOM_ID: adhoc/lxml-type-stubs
+:ASSIGNEES: Claude Code
+:SOURCE: adhoc
+:DISPOSITION: defer
+:END:
+In ~src/schemas/article.py~, basedpyright complains that ~_Element~ is not
+known.  Add type hints for lxml using [[https://github.com/lxml/lxml-stubs/blob/master/lxml-stubs/etree.pyi][lxml-stubs]].
+
+*** DONE Create Pydantic schema for CEO3 Items
+:PROPERTIES:
+:CUSTOM_ID: adhoc/ceo-pydantic-schema
+:ASSIGNEES: Claude Code
+:SOURCE: adhoc
+:DISPOSITION: fix now
+:COMMIT: 18d986d
+:END:
+The CEOClient needs this schema to validate data it fetches; other
+components will use it to access record fields.
+
+**** Implementation
+[[https://docs.getsnworks.com/ceo2/front-end/json-api.html][CEO FrontEnd JSON API]] used as reference.
+
+*** DONE Fix bug: API request fails with a 403 error
+:PROPERTIES:
+:CUSTOM_ID: adhoc/api-request-403
+:ASSIGNEES: Claude Code
+:SOURCE: adhoc
+:DISPOSITION: fix now
+:COMMIT: 99e6967
+:END:
+~pdm run python -m periodical_distiller.cli harvest-pip --date 2026-01-15~
+returned HTTP 403 from the CEO3 endpoint.
+
+**** Implementation
+Root cause: incorrect API endpoint.  Switched to ~section/news.json~.
+
+*** DONE Fix bug: media requests fail with 404
+:PROPERTIES:
+:CUSTOM_ID: adhoc/media-request-404
+:ASSIGNEES: Claude Code
+:SOURCE: adhoc
+:DISPOSITION: fix now
+:END:
+Media downloads failing with HTTP 404.
+
+**** Implementation
+Root cause: incorrect imgix CDN URL format.  Was using
+~{attachment_uuid}/{base_name}.{extension}~; correct format is
+~pri/{attachment_uuid}.sized-1000x1000.{extension}~.
+
+*** DONE Fix bug: Flourish redirects and HEIC media downloads
+:PROPERTIES:
+:CUSTOM_ID: adhoc/flourish-heic-bug
+:ASSIGNEES: Claude Code
+:SOURCE: adhoc
+:DISPOSITION: fix now
+:END:
+1. Flourish chart thumbnails failed with HTTP 302 (redirect not followed).
+2. HEIC media files failed with HTTP 404.
+
+**** Implementation
+1. *Flourish 302*: added ~follow_redirects=True~ to httpx.Client constructor.
+2. *HEIC 404*: imgix stores HEIC files as PNG.  Added fallback URL logic
+   trying multiple extensions (jpg, png) when primary URL returns 404.
+
+Changed: ~MediaDownloader._get_client()~, ~_build_media_urls()~,
+~_download_dominant_media()~.
+
+*** DONE Fix bug: HTML transformer output does not include dominant media
+:PROPERTIES:
+:CUSTOM_ID: adhoc/html-dominant-media
+:ASSIGNEES: Claude Code
+:SOURCE: adhoc
+:DISPOSITION: fix now
+:END:
+CEO records include a ~dominantMedia~ property (image below headline, above
+byline) that was not rendered in the HTML output.
+
+**** Implementation
+Added dominant-media rendering to the HTML transformer.  The ~content~
+field within ~dominantMedia~ contains a caption (~<h5>~) and credit line
+(~<h6>~); these are transformed into ~<div class="caption">~ and
+~<div class="credit">~ respectively, with CSS stylesheet additions.
+Filtered on ~"type": "image"~; other dominant media types are left for
+later research (see ~adhoc/dominant-media-types~).
+
+*** TODO [#C] Research: what are the forms of Dominant Media for articles?
+:PROPERTIES:
+:CUSTOM_ID: adhoc/dominant-media-types
+:ASSIGNEES: Claude Code, Cliff
+:SOURCE: adhoc
+:DISPOSITION: defer
+:END:
+A small sampling shows one format — ~"type":"image"~ — but there may be
+others.  Download a sampling of CEO records and gather values from the
+~dominantMedia["type"]~ property; produce a report ~dominant-media-types.org~.
+
+*** DONE [#A] PDFTransformer.transform signature doesn't match base class
+:PROPERTIES:
+:CUSTOM_ID: adhoc/pdftransformer-signature
+:ASSIGNEES: Claude Code
+:SOURCE: adhoc
+:DISPOSITION: fix now
+:END:
+The base ~Transformer~ class takes a ~pip_path~ as an argument but
+~PDFTransformer.transform~ does not.  This causes basedpyright to complain.
+
+**** Decision
+[2026-02-02] Split ~Transformer~ into two base classes:
+- ~PIPTransformer~: PIP→SIP transformers (e.g., ~HTMLTransformer~)
+- ~SIPTransformer~: SIP→SIP enrichment (e.g., ~PDFTransformer~)
+- ~Transformer~ kept as alias for backwards compatibility.
+
+*** DONE [#A] Fix bug: error trying to load image / stylesheet file
+:PROPERTIES:
+:CUSTOM_ID: adhoc/weasyprint-base-url
+:ASSIGNEES: Claude Code
+:SOURCE: adhoc
+:DISPOSITION: fix now
+:END:
+WeasyPrint failed to load stylesheets and images because ~base_url~ was
+constructed as ~f"file://{article_dir}/"~.  When ~article_dir~ is a relative
+path, this produced ~file://workspace/sips/...~ — a malformed URI with
+the directory as an authority component, which WeasyPrint resolved to
+~/sips/...~ (not found).
+
+**** Implementation
+Replaced ~f"file://{article_dir}/"~ with ~article_dir.resolve().as_uri() + "/"~.
+~Path.resolve()~ converts to an absolute path; ~Path.as_uri()~ always emits
+the correct three-slash form (~file:///abs/path/~).
+
+* Project Strawberry
+Placeholder for items related to generalising the architecture beyond the
+Daily Princetonian / CEO3 source.
+
+The domain objects in ~src/schemas/~ (~Article~, ~Issue~, ~Page~) are reserved
+for this phase.  See ~review/dead-domain-objects~ for context.
+
+Key open questions (to be developed as items when the phase begins):
+- What is CEO3-specific vs. what should be abstract?
+- How are aggregators made pluggable for different sources?
+- How is template/stylesheet selection made configurable per source?
+- How is multi-source pipeline configuration managed?
+
+* Pending (blocked on Veridian response)
+
+** TODO [#B] Confirm FLocat href format with Veridian
+:PROPERTIES:
+:CUSTOM_ID: pending/flocat-href-format
+:ASSIGNEES: Cliff
+:SOURCE: adhoc
+:DISPOSITION: defer
+:END:
+See ~review/mets-file-uri-format~.  Current ~file://./~ prefix is non-standard.
+High confidence that plain relative paths are correct; awaiting Veridian
+confirmation before changing.
+
+** TODO [#C] Confirm whether METS CHECKSUM attributes are required
+:PROPERTIES:
+:CUSTOM_ID: pending/mets-checksums
+:ASSIGNEES: Cliff
+:SOURCE: adhoc
+:DISPOSITION: defer
+:END:
+See ~review/mets-no-checksums~.  Likely superfluous for this use case;
+awaiting Veridian spec confirmation.

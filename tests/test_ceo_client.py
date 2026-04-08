@@ -158,7 +158,10 @@ class TestCeoClientFetch:
         client = CeoClient(ceo_config)
 
         # Missing required fields (has headline so it passes the article filter)
-        invalid_record = {"id": "12345", "headline": "Bad Article", "published_at": "2026-01-15 10:00:00"}
+        invalid_record = dict()
+        invalid_record["id"] = "12345"
+        invalid_record["headline"] = "Bad Article"
+        invalid_record["published_at"] = "2026-01-15 10:00:00"
 
         mock_http_client = MagicMock()
         mock_http_client.request.return_value = make_ceo_response([invalid_record])

@@ -48,7 +48,10 @@ def main() -> int:
                 try:
                     manifest = aggregator.create_pip_for_date(current)
                     if not manifest.articles:
-                        logger.info(f"[{succeeded + skipped + len(failed) + 1}/{total_days}] {current}: no content, skipping")
+                        logger.info(
+                            f"[{succeeded + skipped + len(failed) + 1}/{total_days}]"
+                            f" {current}: no content, skipping"
+                            )
                         shutil.rmtree(pip_dir)
                         skipped += 1
                         current += timedelta(days=1)

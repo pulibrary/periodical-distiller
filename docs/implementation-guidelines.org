@@ -1,0 +1,23 @@
+#+title: Periodical Distiller Implementation Guidelines
+#+date: <2026-04-07 Tue>
+#+author: C. Wulfman
+#+email: cwulfman@princeton.edu
+
+* Implementation Guidelines
+
+** Development
+- The reference implementation shall be written in Python.
+- Prefer the latest stable version of Python unless there are
+  conflicts with dependencies.
+- Use [[https://pdm-project.org/en/latest/][PDM]] to manage dependencies. Configure PDM to use [[https://docs.astral.sh/uv/][uv]].
+- Use the [[https://docs.pytest.org/en/stable/][pytest]] framework for testing.
+
+
+** Programming Paradigms
+- Use Object-Oriented Programming methods and techniques.
+- Use dependency injection to reduce coupling.
+- Follow [[https://en.wikipedia.org/wiki/SOLID][SOLID principles]].
+- Follow [[https://peps.python.org/pep-0008/][PEP 8]].
+
+** Deployment
+- Use GitHub Actions to manage workflows

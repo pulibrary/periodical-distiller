@@ -640,6 +640,10 @@ warning is logged for the skipped article, and pagination continues.
 In ~src/schemas/article.py~, basedpyright complains that ~_Element~ is not
 known.  Add type hints for lxml using [[https://github.com/lxml/lxml-stubs/blob/master/lxml-stubs/etree.pyi][lxml-stubs]].
 
+**** Decision
+[2026-04-08 Wed] This is an easy fix. Implement it.
+
+
 *** DONE Create Pydantic schema for CEO3 Items
 :PROPERTIES:
 :CUSTOM_ID: adhoc/ceo-pydantic-schema

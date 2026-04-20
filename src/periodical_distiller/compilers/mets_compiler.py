@@ -300,7 +300,7 @@ class METSCompiler(Compiler):
             page_div.set("ID", f"DIVP{global_n}")
             page_div.set("ORDER", str(global_n))
             page_div.set("ORDERLABEL", str(global_n))
-            page_div.set("TYPE", "INSIDE")
+            page_div.set("TYPE", "PAGE")
 
             fptr = etree.SubElement(page_div, f"{{{METS_NS}}}fptr")
             par = etree.SubElement(fptr, f"{{{METS_NS}}}par")

@@ -497,6 +497,18 @@ class TestMETSStructMaps:
         assert fptr is not None
         assert "PDF_12345" in fptr.get("FILEID", "")
 
+    def test_physical_page_div_type_is_page(self, full_sip):
+        """Physical structMap page divs have TYPE='PAGE', not 'INSIDE'."""
+        METSCompiler().compile(full_sip)
+        root = _parse_mets(full_sip / "mets.xml")
+        phys = next(
+            sm for sm in root.findall(_mets_tag("structMap"))
+            if sm.get("TYPE") == "PHYSICAL"
+        )
+        page_div = phys.find(f".//{_mets_tag('div')}[@ID='DIVP1']")
+        assert page_div is not None
+        assert page_div.get("TYPE") == "PAGE"
+
     def test_logical_struct_map_newspaper_label(self, full_sip):
         """Logical structMap Newspaper div has the publication title as LABEL."""
         METSCompiler().compile(full_sip)

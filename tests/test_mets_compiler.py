@@ -43,6 +43,29 @@ def _make_pdf(path: Path, pages: int = 1) -> None:
     doc.close()
 
 
+ALTO_NS = "http://www.loc.gov/standards/alto/ns-v2#"
+
+
+def _make_alto_xml(page_number: int, block_count: int = 2) -> bytes:
+    """Build a minimal ALTO XML document with TextBlock elements."""
+    root = etree.Element(f"{{{ALTO_NS}}}alto", nsmap={None: ALTO_NS})
+    layout = etree.SubElement(root, f"{{{ALTO_NS}}}Layout")
+    page_el = etree.SubElement(layout, f"{{{ALTO_NS}}}Page")
+    page_el.set("ID", f"page_{page_number}")
+    print_space = etree.SubElement(page_el, f"{{{ALTO_NS}}}PrintSpace")
+    for i in range(block_count):
+        block = etree.SubElement(print_space, f"{{{ALTO_NS}}}TextBlock")
+        block.set("ID", f"block_{page_number}_{i}")
+        block.set("HPOS", "50")
+        block.set("VPOS", str(100 + i * 60))
+        block.set("WIDTH", "200")
+        block.set("HEIGHT", "50")
+    return cast(
+        bytes,
+        etree.tostring(root, xml_declaration=True, encoding="UTF-8", pretty_print=True),
+    )
+
+
 def _make_mods_xml(title: str, authors: list[str]) -> bytes:
     """Build a minimal MODS XML document."""
     ns = MODS_NS
@@ -111,9 +134,7 @@ def full_sip(tmp_path: Path) -> Path:
     (article_dir / "article.mods.xml").write_bytes(
         _make_mods_xml("Test Headline", ["Jane Doe"])
     )
-    (article_dir / "001.alto.xml").write_text(
-        '<?xml version="1.0"?><alto xmlns="http://www.loc.gov/standards/alto/ns-v2#"/>'
-    )
+    (article_dir / "001.alto.xml").write_bytes(_make_alto_xml(page_number=1, block_count=2))
 
     sip_manifest = SIPManifest(
         id="2026-01-29",
@@ -188,9 +209,7 @@ def full_sip_two_articles(tmp_path: Path) -> Path:
         (article_dir / "article.mods.xml").write_bytes(
             _make_mods_xml(f"Article {i}", [f"Author {i}"])
         )
-        (article_dir / "001.alto.xml").write_text(
-            '<?xml version="1.0"?><alto xmlns="http://www.loc.gov/standards/alto/ns-v2#"/>'
-        )
+        (article_dir / "001.alto.xml").write_bytes(_make_alto_xml(page_number=1, block_count=2))
         articles.append(
             SIPArticle(
                 ceo_id=ceo_id,
@@ -606,6 +625,123 @@ class TestMETSCompilerMultipleArticles:
         article_divs = logical.findall(f".//{_mets_tag('div')}[@TYPE='Article']")
         orders = [div.get("ORDER") for div in article_divs]
         assert orders == ["1", "2"]
+
+
+# ---------------------------------------------------------------------------
+# Tests: ALTO area tags in logical structMap
+# ---------------------------------------------------------------------------
+
+class TestMETSALTOAreaTags:
+    def test_article_div_has_alto_fptr(self, full_sip):
+        """Article div includes an fptr/seq with area tags for each TextBlock."""
+        METSCompiler().compile(full_sip)
+        root = _parse_mets(full_sip / "mets.xml")
+        logical = next(
+            sm for sm in root.findall(_mets_tag("structMap"))
+            if sm.get("TYPE") == "LOGICAL"
+        )
+        article_div = logical.find(f".//{_mets_tag('div')}[@TYPE='Article']")
+        seq = article_div.find(f".//{_mets_tag('seq')}")
+        assert seq is not None, "Expected <seq> under Article div's ALTO fptr"
+        areas = seq.findall(_mets_tag("area"))
+        assert len(areas) == 2  # block_count=2 in fixture
+
+    def test_alto_area_fileid_matches_alto_grp(self, full_sip):
+        """ALTO area FILEID values match IDs defined in ALTOGRP."""
+        METSCompiler().compile(full_sip)
+        root = _parse_mets(full_sip / "mets.xml")
+        # Collect ALTO file IDs from fileSec
+        alto_file_ids = {
+            f.get("ID")
+            for f in root.findall(
+                f".//{_mets_tag('fileGrp')}[@ID='ALTOGRP']/{_mets_tag('file')}"
+            )
+        }
+        # Collect FILEID values from logical structMap area tags
+        logical = next(
+            sm for sm in root.findall(_mets_tag("structMap"))
+            if sm.get("TYPE") == "LOGICAL"
+        )
+        area_file_ids = {
+            a.get("FILEID")
+            for a in logical.findall(f".//{_mets_tag('area')}")
+            if a.get("FILEID", "").startswith("ALTO_")
+        }
+        assert area_file_ids <= alto_file_ids
+
+    def test_alto_area_begin_matches_block_ids(self, full_sip):
+        """ALTO area BEGIN values match actual TextBlock IDs in the ALTO file."""
+        METSCompiler().compile(full_sip)
+        root = _parse_mets(full_sip / "mets.xml")
+        logical = next(
+            sm for sm in root.findall(_mets_tag("structMap"))
+            if sm.get("TYPE") == "LOGICAL"
+        )
+        begin_values = [
+            a.get("BEGIN")
+            for a in logical.findall(f".//{_mets_tag('area')}")
+            if a.get("FILEID", "").startswith("ALTO_")
+        ]
+        assert begin_values == ["block_1_0", "block_1_1"]
+
+    def test_no_alto_fptr_when_no_text_blocks(self, tmp_path):
+        """Article div has no ALTO fptr when the ALTO file contains no TextBlocks."""
+        pip_dir = tmp_path / "pips" / "2026-01-29"
+        pip_dir.mkdir(parents=True)
+        pip_manifest = PIPManifest(
+            id="2026-01-29",
+            title="The Daily Princetonian",
+            date_range=("2026-01-29", "2026-01-29"),
+        )
+        (pip_dir / "pip-manifest.json").write_text(pip_manifest.model_dump_json(indent=2))
+
+        sip_dir = tmp_path / "sips" / "2026-01-29"
+        article_dir = sip_dir / "articles" / "55555"
+        article_dir.mkdir(parents=True)
+        _make_pdf(article_dir / "article.pdf")
+        # ALTO with no TextBlocks
+        (article_dir / "001.alto.xml").write_text(
+            '<?xml version="1.0"?><alto xmlns="http://www.loc.gov/standards/alto/ns-v2#"/>'
+        )
+        sip_manifest = SIPManifest(
+            id="2026-01-29",
+            pip_id="2026-01-29",
+            pip_path=str(pip_dir),
+            articles=[
+                SIPArticle(
+                    ceo_id="55555",
+                    pdf_path="articles/55555/article.pdf",
+                    mods_path=None,
+                    pages=[SIPPage(page_number=1, alto_path="articles/55555/001.alto.xml")],
+                )
+            ],
+        )
+        (sip_dir / "sip-manifest.json").write_text(sip_manifest.model_dump_json(indent=2))
+
+        METSCompiler().compile(sip_dir)
+        root = _parse_mets(sip_dir / "mets.xml")
+        logical = next(
+            sm for sm in root.findall(_mets_tag("structMap"))
+            if sm.get("TYPE") == "LOGICAL"
+        )
+        article_div = logical.find(f".//{_mets_tag('div')}[@TYPE='Article']")
+        seq = article_div.find(f".//{_mets_tag('seq')}")
+        assert seq is None, "Expected no <seq> when ALTO has no TextBlocks"
+
+    def test_two_articles_each_have_alto_areas(self, full_sip_two_articles):
+        """Each article div in a two-article SIP has its own ALTO area tags."""
+        METSCompiler().compile(full_sip_two_articles)
+        root = _parse_mets(full_sip_two_articles / "mets.xml")
+        logical = next(
+            sm for sm in root.findall(_mets_tag("structMap"))
+            if sm.get("TYPE") == "LOGICAL"
+        )
+        article_divs = logical.findall(f".//{_mets_tag('div')}[@TYPE='Article']")
+        assert len(article_divs) == 2
+        for div in article_divs:
+            seq = div.find(f".//{_mets_tag('seq')}")
+            assert seq is not None
+            assert len(seq.findall(_mets_tag("area"))) == 2
 
 
 # ---------------------------------------------------------------------------

@@ -22,6 +22,7 @@ METS_NS = "http://www.loc.gov/METS/"
 MODS_NS = "http://www.loc.gov/mods/v3"
 XLINK_NS = "http://www.w3.org/1999/xlink"
 XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
+ALTO_NS = "http://www.loc.gov/standards/alto/ns-v2#"
 
 
 class METSCompiler(Compiler):
@@ -351,6 +352,21 @@ class METSCompiler(Compiler):
                 fptr = etree.SubElement(article_div, f"{{{METS_NS}}}fptr")
                 fptr.set("FILEID", f"PDF_{article.ceo_id}")
 
+            # ALTO area tags: one <area> per TextBlock across all pages of the article
+            alto_areas: list[tuple[str, str]] = []
+            for page in sorted(article.pages, key=lambda p: p.page_number):
+                alto_file_id = f"ALTO_{article.ceo_id}_{page.page_number:03d}"
+                for block_id in self._extract_alto_block_ids(sip_path / page.alto_path):
+                    alto_areas.append((alto_file_id, block_id))
+            if alto_areas:
+                alto_fptr = etree.SubElement(article_div, f"{{{METS_NS}}}fptr")
+                seq = etree.SubElement(alto_fptr, f"{{{METS_NS}}}seq")
+                for alto_file_id, block_id in alto_areas:
+                    area = etree.SubElement(seq, f"{{{METS_NS}}}area")
+                    area.set("BETYPE", "IDREF")
+                    area.set("FILEID", alto_file_id)
+                    area.set("BEGIN", block_id)
+
         return struct_map
 
     def _extract_article_mods(self, sip_path: Path, article: SIPArticle) -> dict:
@@ -389,6 +405,21 @@ class METSCompiler(Compiler):
         except Exception as e:
             logger.warning(f"Could not parse MODS for article {article.ceo_id}: {e}")
             return {"title": f"Article {article.ceo_id}", "authors": []}
+
+    def _extract_alto_block_ids(self, alto_path: Path) -> list[str]:
+        """Return TextBlock IDs from an ALTO XML file, in document order.
+
+        Returns an empty list if the file is absent, unreadable, or has no blocks.
+        """
+        if not alto_path.exists():
+            return []
+        try:
+            root = etree.parse(str(alto_path)).getroot()
+            blocks = root.findall(f".//{{{ALTO_NS}}}TextBlock")
+            return [b.get("ID") for b in blocks if b.get("ID")]
+        except Exception as e:
+            logger.warning(f"Could not parse ALTO at {alto_path}: {e}")
+            return []
 
     def _global_pages(
         self, sip_manifest: SIPManifest

@@ -328,22 +328,32 @@ class METSCompiler(Compiler):
         struct_map.set("LABEL", "Logical Structure")
         struct_map.set("TYPE", "LOGICAL")
 
+        counter = [0]
+
+        def _next_id() -> str:
+            counter[0] += 1
+            return f"DIVL{counter[0]}"
+
         newspaper_div = etree.SubElement(struct_map, f"{{{METS_NS}}}div")
+        newspaper_div.set("ID", _next_id())
         newspaper_div.set("TYPE", "Newspaper")
         newspaper_div.set("LABEL", pip_manifest.title)
 
         issue_div = etree.SubElement(newspaper_div, f"{{{METS_NS}}}div")
+        issue_div.set("ID", _next_id())
         issue_div.set("TYPE", "Issue")
         issue_div.set("LABEL", pip_manifest.date_range[0])
         issue_div.set("DMDID", "dmd1")
 
         contents_div = etree.SubElement(issue_div, f"{{{METS_NS}}}div")
+        contents_div.set("ID", _next_id())
         contents_div.set("TYPE", "EditorialContent")
         contents_div.set("LABEL", "Contents")
 
         for n, article in enumerate(sip_manifest.articles, start=1):
             article_data = self._extract_article_mods(sip_path, article)
             article_div = etree.SubElement(contents_div, f"{{{METS_NS}}}div")
+            article_div.set("ID", _next_id())
             article_div.set("TYPE", "Article")
             article_div.set("DMDID", f"c{n:04d}")
             article_div.set("ORDER", str(n))

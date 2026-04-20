@@ -134,7 +134,7 @@ class METSCompiler(Compiler):
         root.append(self._build_dmd_sec(sip_path, sip_manifest, pip_manifest))
         root.append(self._build_file_sec(sip_manifest))
         root.append(self._build_physical_struct_map(sip_manifest))
-        root.append(self._build_logical_struct_map(sip_manifest, pip_manifest))
+        root.append(self._build_logical_struct_map(sip_path, sip_manifest, pip_manifest))
 
         return root
 
@@ -318,6 +318,7 @@ class METSCompiler(Compiler):
 
     def _build_logical_struct_map(
         self,
+        sip_path: Path,
         sip_manifest: SIPManifest,
         pip_manifest: PIPManifest,
     ) -> etree._Element:
@@ -340,10 +341,12 @@ class METSCompiler(Compiler):
         contents_div.set("LABEL", "Contents")
 
         for n, article in enumerate(sip_manifest.articles, start=1):
+            article_data = self._extract_article_mods(sip_path, article)
             article_div = etree.SubElement(contents_div, f"{{{METS_NS}}}div")
             article_div.set("TYPE", "Article")
             article_div.set("DMDID", f"c{n:04d}")
             article_div.set("ORDER", str(n))
+            article_div.set("LABEL", article_data.get("title", f"Article {article.ceo_id}"))
             if article.pdf_path:
                 fptr = etree.SubElement(article_div, f"{{{METS_NS}}}fptr")
                 fptr.set("FILEID", f"PDF_{article.ceo_id}")

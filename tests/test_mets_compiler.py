@@ -490,6 +490,73 @@ class TestMETSStructMaps:
         assert newspaper_div is not None
         assert newspaper_div.get("LABEL") == "The Daily Princetonian"
 
+    def test_logical_article_div_has_label(self, full_sip):
+        """Logical structMap Article div has LABEL set to the article's MODS title."""
+        METSCompiler().compile(full_sip)
+        root = _parse_mets(full_sip / "mets.xml")
+        logical = next(
+            sm for sm in root.findall(_mets_tag("structMap"))
+            if sm.get("TYPE") == "LOGICAL"
+        )
+        article_div = logical.find(f".//{_mets_tag('div')}[@TYPE='Article']")
+        assert article_div is not None
+        assert article_div.get("LABEL") == "Test Headline"
+
+    def test_logical_article_div_label_fallback(self, tmp_path):
+        """Article div LABEL falls back to 'Article {ceo_id}' when no MODS title."""
+        pip_dir = tmp_path / "pips" / "2026-01-29"
+        pip_dir.mkdir(parents=True)
+        pip_manifest = PIPManifest(
+            id="2026-01-29",
+            title="The Daily Princetonian",
+            date_range=("2026-01-29", "2026-01-29"),
+        )
+        (pip_dir / "pip-manifest.json").write_text(pip_manifest.model_dump_json(indent=2))
+
+        sip_dir = tmp_path / "sips" / "2026-01-29"
+        article_dir = sip_dir / "articles" / "99999"
+        article_dir.mkdir(parents=True)
+        _make_pdf(article_dir / "article.pdf")
+        (article_dir / "001.alto.xml").write_text(
+            '<?xml version="1.0"?><alto xmlns="http://www.loc.gov/standards/alto/ns-v2#"/>'
+        )
+        sip_manifest = SIPManifest(
+            id="2026-01-29",
+            pip_id="2026-01-29",
+            pip_path=str(pip_dir),
+            articles=[
+                SIPArticle(
+                    ceo_id="99999",
+                    pdf_path="articles/99999/article.pdf",
+                    mods_path=None,
+                    pages=[SIPPage(page_number=1, alto_path="articles/99999/001.alto.xml")],
+                )
+            ],
+        )
+        (sip_dir / "sip-manifest.json").write_text(sip_manifest.model_dump_json(indent=2))
+
+        METSCompiler().compile(sip_dir)
+        root = _parse_mets(sip_dir / "mets.xml")
+        logical = next(
+            sm for sm in root.findall(_mets_tag("structMap"))
+            if sm.get("TYPE") == "LOGICAL"
+        )
+        article_div = logical.find(f".//{_mets_tag('div')}[@TYPE='Article']")
+        assert article_div is not None
+        assert article_div.get("LABEL") == "Article 99999"
+
+    def test_logical_two_articles_have_distinct_labels(self, full_sip_two_articles):
+        """Two articles each have their MODS title as LABEL."""
+        METSCompiler().compile(full_sip_two_articles)
+        root = _parse_mets(full_sip_two_articles / "mets.xml")
+        logical = next(
+            sm for sm in root.findall(_mets_tag("structMap"))
+            if sm.get("TYPE") == "LOGICAL"
+        )
+        article_divs = logical.findall(f".//{_mets_tag('div')}[@TYPE='Article']")
+        labels = [d.get("LABEL") for d in article_divs]
+        assert labels == ["Article 1", "Article 2"]
+
 
 # ---------------------------------------------------------------------------
 # Tests: Multiple articles

@@ -466,3 +466,99 @@ class TestALTOTransformerHelpers:
         assert print_space is not None
         blocks = alto.findall(f".//{{{ALTO_NS}}}TextBlock")
         assert len(blocks) == 0
+
+
+# ---------------------------------------------------------------------------
+# Tests: _merge_nearby_blocks()
+# ---------------------------------------------------------------------------
+
+def _make_block(x0, y0, x1, y1, words=None):
+    """Minimal (block_bbox, lines) pair for testing _merge_nearby_blocks."""
+    if words is None:
+        words = [(x0, y0, x1, y1, "word")]
+    return ((x0, y0, x1, y1), [(0, words)])
+
+
+class TestALTOMergeBlocks:
+    def test_empty_input(self):
+        """Empty block list returns empty list."""
+        assert ALTOTransformer()._merge_nearby_blocks([]) == []
+
+    def test_single_block_unchanged(self):
+        """A single block is returned as-is."""
+        block = _make_block(0, 0, 100, 12)
+        result = ALTOTransformer()._merge_nearby_blocks([block])
+        assert len(result) == 1
+
+    def test_merge_close_blocks(self):
+        """Two blocks with small vertical gap and horizontal overlap are merged."""
+        # gap = 5, height = 12, ratio = 0.42 < 0.6 → should merge
+        b0 = _make_block(50, 0, 400, 12)
+        b1 = _make_block(50, 17, 400, 29)
+        result = ALTOTransformer()._merge_nearby_blocks([b0, b1])
+        assert len(result) == 1
+        bbox, lines = result[0]
+        assert bbox == (50, 0, 400, 29)
+        assert len(lines) == 2
+
+    def test_keep_distant_blocks_separate(self):
+        """Blocks with a large vertical gap are kept as separate TextBlocks."""
+        # gap = 100, height = 12, ratio = 8.3 > 0.6 → should not merge
+        b0 = _make_block(50, 0, 400, 12)
+        b1 = _make_block(50, 112, 400, 124)
+        result = ALTOTransformer()._merge_nearby_blocks([b0, b1])
+        assert len(result) == 2
+
+    def test_keep_nonoverlapping_blocks_separate(self):
+        """Horizontally non-overlapping blocks (two-column) are not merged."""
+        # Columns side by side, small vertical gap
+        b0 = _make_block(0, 0, 200, 12)
+        b1 = _make_block(250, 17, 450, 29)  # no horizontal overlap with b0
+        result = ALTOTransformer()._merge_nearby_blocks([b0, b1])
+        assert len(result) == 2
+
+    def test_merge_preserves_line_order(self):
+        """After merging, lines appear in top-to-bottom order."""
+        b0 = _make_block(50, 0, 400, 12, [(50, 0, 200, 12, "first")])
+        b1 = _make_block(50, 17, 400, 29, [(50, 17, 200, 29, "second")])
+        _, lines = ALTOTransformer()._merge_nearby_blocks([b0, b1])[0]
+        word_texts = [w[4] for _ln, ws in lines for w in ws]
+        assert word_texts == ["first", "second"]
+
+    def test_chain_merge_three_blocks(self):
+        """Three vertically adjacent blocks collapse into one."""
+        b0 = _make_block(50, 0, 400, 12)
+        b1 = _make_block(50, 17, 400, 29)
+        b2 = _make_block(50, 34, 400, 46)
+        result = ALTOTransformer()._merge_nearby_blocks([b0, b1, b2])
+        assert len(result) == 1
+        _, lines = result[0]
+        assert len(lines) == 3
+
+    def test_partial_merge(self):
+        """A+B merge, C is far away → two blocks total."""
+        b0 = _make_block(50, 0, 400, 12)
+        b1 = _make_block(50, 17, 400, 29)
+        b2 = _make_block(50, 200, 400, 212)  # far below
+        result = ALTOTransformer()._merge_nearby_blocks([b0, b1, b2])
+        assert len(result) == 2
+        _, lines0 = result[0]
+        assert len(lines0) == 2
+        _, lines1 = result[1]
+        assert len(lines1) == 1
+
+    def test_gap_factor_boundary(self):
+        """Blocks at exactly gap_factor × height are not merged (strict <)."""
+        # gap = 6, height = 10, ratio = 0.6 exactly → not merged (≤ boundary: merged)
+        b0 = _make_block(50, 0, 400, 10)
+        b1 = _make_block(50, 16, 400, 26)  # gap = 16 - 10 = 6, ratio = 0.6
+        result = ALTOTransformer()._merge_nearby_blocks([b0, b1])
+        # ratio == gap_factor → condition is 0 <= 6 <= 0.6*10=6 → True → merged
+        assert len(result) == 1
+
+    def test_overlapping_blocks_not_merged(self):
+        """Blocks that overlap vertically (gap < 0) are not merged."""
+        b0 = _make_block(50, 0, 400, 20)
+        b1 = _make_block(50, 15, 400, 35)  # gap = 15 - 20 = -5
+        result = ALTOTransformer()._merge_nearby_blocks([b0, b1])
+        assert len(result) == 2

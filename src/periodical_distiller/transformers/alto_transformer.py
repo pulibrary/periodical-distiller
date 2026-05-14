@@ -154,6 +154,7 @@ class ALTOTransformer(SIPTransformer):
 
         words = page.get_text("words")
         text_blocks = self._group_words(words)
+        text_blocks = self._merge_nearby_blocks(text_blocks)
 
         for block_index, (block_bbox, lines) in enumerate(text_blocks):
             block_el = self._build_text_block(
@@ -197,6 +198,58 @@ class ALTOTransformer(SIPTransformer):
             result.append((block_bbox, sorted_lines))
 
         return result
+
+    def _merge_nearby_blocks(self, blocks: list, gap_factor: float = 0.6) -> list:
+        """Merge vertically adjacent, horizontally overlapping blocks into one TextBlock.
+
+        The HTML-to-PDF renderer emits each visual line as a separate text object,
+        so PyMuPDF assigns distinct block numbers to consecutive lines of the same
+        paragraph.  This method re-joins them so each ALTO TextBlock contains one
+        TextLine per visual line rather than one TextLine total.
+
+        Two blocks are merged when:
+          - vertical gap ≥ 0 and ≤ gap_factor × height of the preceding block
+          - horizontal extents overlap (> 0 pixels)
+
+        Args:
+            blocks: Output of _group_words() — list of (block_bbox, lines) pairs.
+            gap_factor: Threshold as a multiple of the preceding block's height.
+                        0.6 correctly separates paragraph lines (ratio ≤ 0.5) from
+                        distinct layout elements (ratio ≥ 0.7) in CEO3-generated PDFs.
+
+        Returns:
+            New list of (block_bbox, lines) pairs with fewer, larger blocks.
+        """
+        if not blocks:
+            return blocks
+
+        sorted_blocks = sorted(blocks, key=lambda b: b[0][1])
+
+        accumulated = [list(sorted_blocks[0])]
+
+        for curr_bbox, curr_lines in sorted_blocks[1:]:
+            prev_bbox, prev_lines = accumulated[-1]
+            prev_x0, prev_y0, prev_x1, prev_y1 = prev_bbox
+            curr_x0, curr_y0, curr_x1, curr_y1 = curr_bbox
+
+            prev_height = prev_y1 - prev_y0
+            gap = curr_y0 - prev_y1
+            h_overlap = min(prev_x1, curr_x1) - max(prev_x0, curr_x0)
+
+            if prev_height > 0 and 0 <= gap <= gap_factor * prev_height and h_overlap > 0:
+                new_bbox = (
+                    min(prev_x0, curr_x0),
+                    prev_y0,
+                    max(prev_x1, curr_x1),
+                    curr_y1,
+                )
+                base = len(prev_lines)
+                merged_lines = prev_lines + [(base + i, ws) for i, (_, ws) in enumerate(curr_lines)]
+                accumulated[-1] = [new_bbox, merged_lines]
+            else:
+                accumulated.append([curr_bbox, list(curr_lines)])
+
+        return [(tuple(b[0]), b[1]) for b in accumulated]
 
     def _build_text_block(
         self,

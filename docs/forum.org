@@ -766,7 +766,219 @@ the directory as an authority component, which WeasyPrint resolved to
 Replaced ~f"file://{article_dir}/"~ with ~article_dir.resolve().as_uri() + "/"~.
 ~Path.resolve()~ converts to an absolute path; ~Path.as_uri()~ always emits
 the correct three-slash form (~file:///abs/path/~).
+*** TODO [#A] Make SIPs fully compatible with Veridian ingest
+:PROPERTIES:
+:CUSTOM_ID: adhoc/sip-compabibility
+:ASSIGNEES: Claude Code
+:SOURCE: adhoc
+:DISPOSITION: fix now
+:END:
+:LOGBOOK:
+- [2026-04-20 Sun] All four sub-tasks implemented on separate branches and combined
+  on ~trial/veridian-fixes~.  Trial SIP built from ~workspace/pips/2026-03-30~
+  (6 articles, all with images); packaged as ~workspace/sips/2026-03-30-sip.zip~
+  and sent to Richard Managh for review.
+:END:
+We received [[file:richard_analysis.org][a detailed report]] from Richard Managh in which he reviews
+the sample SIP we sent to Veridian.  We need to respond to this report
+by updating our generation code to produce METS/ALTO the conforms with
+their expectations.
 
+Here is a list of tasks derived from Richard's report:
+
+**** DONE Give all divs ID attributes
+:PROPERTIES:
+:CUSTOM_ID: give-all-divs-id-attributes
+:ASSIGNEES: Claude Code
+:DISPOSITION: fix now
+:BRANCH: fix/mets-div-ids
+:END:
+Richard says:
+#+begin_quote
+One of the differences between the logical structMap in your data and
+what we normally see is that typically all of the divs tend to have
+ID's: (e.g. ID="DIVL15"). So typical in fact that Veridian expects
+this, and the lack of IDs cause errors in Veridian by default when
+importing this data. However, we see that having ID's on those divs is
+optional in the schema, so if you wish, we could customise Veridian to
+not expect those ID's. One way Veridian uses these IDs is during
+ingestion as a reference to determine where in the METS something is
+going wrong.
+#+end_quote
+
+***** Decision
+We do not want Veridian to customize their ingest; we want to add ID
+attributes everywhere they are expected, including on those divs.
+
+Modify METS compiler to add an ID attribute to every div in a logical
+structMap.
+
+**** DONE Give all Article divs LABEL attributes
+:PROPERTIES:
+:CUSTOM_ID: give-all-article-divs-label-attributes
+:ASSIGNEES: Claude Code
+:DISPOSITION: fix now
+:BRANCH: fix/mets-article-labels
+:END:
+Richard says:
+#+begin_quote
+Another typical difference from Princetonian article-level METS/ALTO
+is that these Article div types don't have LABEL attributes. However,
+that should be fine, as you have provided the title metadata of the
+articles in MODS metadata which is associated with each article using
+DMDIDs, so we can determine what each article title is using those
+DMDIDs. There is code in Veridian to do this but for some reason it
+isn't working for this data so we would have to look further into why
+this is.
+#+end_quote
+
+***** Decision
+Again, we do not want them to customize their code unnecessarily: we
+want to add a LABEL attribute to each Article div by copying the title
+from the MODS element that is linked to each div via the DMDID attribute.
+
+**** DONE Change type="INSIDE" to type="PAGE" on page-level divs
+:PROPERTIES:
+:CUSTOM_ID: change-type-inside-to-type-page
+:ASSIGNEES: Claude Code
+:DISPOSITION: fix now
+:BRANCH: fix/mets-page-type
+:END:
+
+Richard says:
+#+begin_quote
+ We also noted that you have type='INSIDE' page-level div types in
+ this data, instead of the default 'PAGE' type, but we assume there
+ may be a good reason for this, so for now we added that to the Papers
+ of Princeton collection configuration of accepted page-level div
+ types.
+#+end_quote
+
+***** Decision
+It is easier for us to change on our side; we have no particular
+reason to use type="INSIDE". Simple fix: emit type='PAGE' instead of
+type='INSIDE'.
+
+**** DONE Associate the set of ALTO text blocks with each article div in the Logical structMap
+:PROPERTIES:
+:CUSTOM_ID: associate-alto-text-blocks-with-article-divs
+:ASSIGNEES: Claude Code
+:DISPOSITION: fix now
+:BRANCH: fix/mets-alto-area-tags
+:END:
+
+
+Richard notes that this is the most important item to deal with:
+#+begin_quote
+ * Probably the most important item to deal with next (in order to ingest the METS/ALTO as article-level as opposed to page-level) is ultimately associating the set of text blocks that make up each article with each article div in the Logical structMap. Currently you have:
+
+          <div TYPE="Article" DMDID="c0002" ORDER="2">
+            <fptr FILEID="PDF_73861"/>
+          </div>
+
+If we definitively know that every page of this data will only ever contain one article, i.e. there are no pages which contain the end of one article and the start of another article, then we can infer that all of the ALTO files in each article-level directory contain all the text blocks that make up that article, and customise the relevant Veridian code to ingest this.
+
+However, even this being the case, we believe it would be a lot clearer in the METS to at least list the ALTO FILEIDs for each article, inside each Article div type. This would also mean less complex customised code to ingest this data.
+
+Beyond this, it seems to us that there is sort of a judgement call to be made as to how much information is included in each article div type, in the Logical structMap:
+
+ * If you wanted to further include area tags listing all of the ALTO fileid's and text blocks associated with each article, that would handle the case if there are ever two articles on one page, and it would also mean that the article div types would more specifically define which exact text blocks make up which article.
+
+ * You are of course creating a necessarily different flavour of METS/ALTO for the online version of the Daily Princetonian than the print version of the Daily Princetonian. For what it's worth, it might be somewhat useful to compare the logical structMaps of the two flavors of METS/ALTO.
+
+For the print version of the Daily Princetonian, we have METS as follows:
+
+   1. Where each <div> has an ID,
+
+   2. Each article div type contains area tags which are used to determine which text blocks in which ALTO files make up each article, and
+
+   3. There is of course a different tree structure to the divs in this different kind of logical structMap.
+
+For clarity, again, we don't think that area tags necessarily have to appear in the logical structMap for the online flavor of METS/ALTO you are developing, but we do believe that (assuming more than one article will never appear on one single page), it would be best to at least list the associated ALTO FILEIDs in each article divtype.
+
+https://papersofprinceton.princeton.edu/princetonperiodicals/custom/princetonperiodicals/web/dailyprincetonian_20240329_mets.xml
+<structMap xmlns="http://www.loc.gov/METS/" LABEL="Logical Structure" TYPE="LOGICAL">
+<div ID="DIVL1" TYPE="Newspaper" LABEL="The Daily Princetonian no. 8 29.03.2024">
+<div ID="DIVL2" TYPE="VOLUME" LABEL="The Daily Princetonian no. 8 29.03.2024">
+<div ID="DIVL3" TYPE="ISSUE" DMDID="ISSUE_DESCRIPTION" LABEL="The Daily Princetonian no. 8 29.03.2024">
+<div ID="DIVL4" TYPE="TITLE_SECTION">
+...
+</div>
+<div ID="DIVL10" TYPE="CONTENT">
+<div ID="DIVL11" TYPE="ARTICLE" DMDID="MODSMD_ARTICLE1" LABEL="ON CAMPUS Preliminary Fall 2024 course offerings leaked on Fizz three days early">
+<div ID="DIVL12" TYPE="HEADING">
+<div ID="DIVL13" TYPE="TITLE">
+<fptr>
+<seq>
+<area BETYPE="IDREF" FILEID="ALTO00001" BEGIN="P1_TB00006"/>
+<area BETYPE="IDREF" FILEID="ALTO00001" BEGIN="P1_TB00007"/>
+</seq>
+</fptr>
+</div>
+</div>
+<div ID="DIVL14" TYPE="BODY">
+<div ID="DIVL15" TYPE="BODY_CONTENT">
+<div ID="DIVL16" TYPE="PARAGRAPH" ORDER="1">
+<div ID="DIVL17" TYPE="TEXT">
+<fptr>
+<seq>
+<area BETYPE="IDREF" FILEID="ALTO00001" BEGIN="P1_TB00008"/>
+<area BETYPE="IDREF" FILEID="ALTO00001" BEGIN="P1_TB00009"/>
+<area BETYPE="IDREF" FILEID="ALTO00001" BEGIN="P1_TB00010"/>
+<area BETYPE="IDREF" FILEID="ALTO00003" BEGIN="P3_TB00001"/>
+</seq>
+</fptr>
+</div>
+</div>
+#+end_quote
+
+***** Decision
+Make these distilled METS files resemble those generated for the print version as possible. So, although
+Richard suggests the area tags are not absolutely necessary, we want to include them. That is, each article div should contain area tags which point the the text blocks inthe ALTO files that make up each article.
+
+**** DONE Change type of contents_div from "EditorialContent" to "Content"
+CLOSED: [2026-05-14 Thu 06:50]
+:LOGBOOK:
+- State "DONE"       from "TODO"       [2026-05-14 Thu 06:50]
+:END:
+
+#+begin_quote
+In the logical structmap, where there is usually a div type called
+'CONTENT' (or 'Content') (which is one level above the article div
+types) you have it called 'EditorialContent'. This isn't a major
+issue, as we are able to add a minor customization to Veridian to
+accept this 'EditorialContent' div type if you prefer to keep it this
+way. Once this customization was added, Veridian was able to recognize
+this document as an article-level (article segmented) METS/ALTO
+document during the ingestion process.
+#+end_quote
+**** DONE Fix "only one TextLine per TextBlock" issue
+CLOSED: [2026-05-14 Thu]
+:PROPERTIES:
+:CUSTOM_ID: fix-only-one-textline-per-textblock-issue
+:ASSIGNEES: Claude Code
+:DISPOSITION: fix now
+:BRANCH: fix/one-textline-per-textblock
+:END:
+:LOGBOOK:
+- State "DONE"       from "TODO"       [2026-05-14 Thu]
+:END:
+
+#+begin_quote
+If you log into the staging Papers of Princetonian collection with
+your cwulfman@princeton.edu account you have access to the
+administrator QA mode feature. If you switch this on, you will
+immediately see that the ALTO for these pages is a little odd, because
+TextBlocks contain at most one TextLine each.
+#+end_quote
+
+Root cause: the HTML→PDF renderer emits each visual line as a separate
+PDF text object, so PyMuPDF assigned each line its own ~block_no~.
+
+Fix: ~ALTOTransformer._merge_nearby_blocks()~ post-processes the output
+of ~_group_words()~, merging vertically adjacent blocks (gap ≤ 0.6 ×
+line height) that have horizontal overlap into one TextBlock with
+multiple TextLines.  10 unit tests added to ~test_alto_transformer.py~.
 * Project Strawberry
 Placeholder for items related to generalising the architecture beyond the
 Daily Princetonian / CEO3 source.
@@ -782,23 +994,50 @@ Key open questions (to be developed as items when the phase begins):
 
 * Pending (blocked on Veridian response)
 
-** TODO [#B] Confirm FLocat href format with Veridian
+** DONE [#B] Confirm FLocat href format with Veridian
+CLOSED: [2026-04-15 Wed 10:36]
 :PROPERTIES:
 :CUSTOM_ID: pending/flocat-href-format
 :ASSIGNEES: Cliff
 :SOURCE: adhoc
-:DISPOSITION: defer
+:DISPOSITION: confirmed
+:END:
+:LOGBOOK:
+- State "DONE"       from "TODO"       [2026-04-15 Wed 10:36]
 :END:
 See ~review/mets-file-uri-format~.  Current ~file://./~ prefix is non-standard.
 High confidence that plain relative paths are correct; awaiting Veridian
 confirmation before changing.
 
-** TODO [#C] Confirm whether METS CHECKSUM attributes are required
+[2026-04-15 Wed] Richard Managh confirmed that the xlink:href syntax we are
+using is correct for Veridian:
+
+#+begin_quote
+What you have already in your latest sample is correct, as all of the
+associated files are in the newspaper issue-level directory structure,
+the paths to these files should be expressed relative to the METS
+file.
+
+e.g.
+        <FLocat LOCTYPE="URL" xlink:href="file://./articles/73833/001.jpg"/>
+        <FLocat LOCTYPE="URL" xlink:href="file://./articles/73833/001.alto.xml"/>
+        <FLocat LOCTYPE="URL" xlink:href="file://./articles/73681/article.pdf"/>
+        <FLocat LOCTYPE="URL" xlink:href="file://./articles/73774/article.mods.xml"/>
+#+end_quote
+
+** DONE [#C] Confirm whether METS CHECKSUM attributes are required
+CLOSED: [2026-04-15 Wed 10:39]
 :PROPERTIES:
 :CUSTOM_ID: pending/mets-checksums
 :ASSIGNEES: Cliff
 :SOURCE: adhoc
-:DISPOSITION: defer
+:DISPOSITION: confirmed
+:END:
+:LOGBOOK:
+- State "DONE"       from "TODO"       [2026-04-15 Wed 10:39]
 :END:
 See ~review/mets-no-checksums~.  Likely superfluous for this use case;
 awaiting Veridian spec confirmation.
+
+[2026-04-15 Wed] Richard implied, his communications with me, that
+checksums are superfluous.

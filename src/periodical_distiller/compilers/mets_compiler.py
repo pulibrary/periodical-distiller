@@ -347,7 +347,7 @@ class METSCompiler(Compiler):
 
         contents_div = etree.SubElement(issue_div, f"{{{METS_NS}}}div")
         contents_div.set("ID", _next_id())
-        contents_div.set("TYPE", "EditorialContent")
+        contents_div.set("TYPE", "Content")
         contents_div.set("LABEL", "Contents")
 
         for n, article in enumerate(sip_manifest.articles, start=1):

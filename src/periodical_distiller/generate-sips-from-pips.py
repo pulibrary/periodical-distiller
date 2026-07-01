@@ -21,7 +21,7 @@ def _is_sealed(sip_path: Path) -> bool:
     if not manifest_path.exists():
         return False
     data = json.loads(manifest_path.read_text())
-    return data.get("status") == "sealed"
+    return bool(data.get("status") == "sealed")
 
 
 def main() -> int:
@@ -74,7 +74,7 @@ def main() -> int:
 
             status = token.get_prop("status") or "unknown"
             if status != "sealed":
-                errors = token.get_prop("validation_errors") or []
+                errors: list[str] = list(token.get_prop("validation_errors") or [])
                 logger.warning(f"  {pip_id}: pipeline ended with status={status}")
                 for e in errors:
                     logger.warning(f"    - {e}")

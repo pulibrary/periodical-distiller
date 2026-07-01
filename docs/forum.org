@@ -979,6 +979,49 @@ Fix: ~ALTOTransformer._merge_nearby_blocks()~ post-processes the output
 of ~_group_words()~, merging vertically adjacent blocks (gap ≤ 0.6 ×
 line height) that have horizontal overlap into one TextBlock with
 multiple TextLines.  10 unit tests added to ~test_alto_transformer.py~.
+* Batch SIP Generation — 2026-07-01
+
+** DONE Generate SIPs from 2020-present PIPs and upload to Google Drive
+CLOSED: [2026-07-01 Tue]
+:PROPERTIES:
+:CUSTOM_ID: adhoc/batch-sip-generation-2026
+:ASSIGNEES: Claude Code, Cliff
+:SOURCE: adhoc
+:DISPOSITION: fix now
+:END:
+:LOGBOOK:
+- State "DONE"       from "TODO"       [2026-07-01 Tue]
+:END:
+GitHub issue #3: generate SIPs from all harvested PIPs (2020-01-10 through
+present) and upload the results to the Papers of Princeton Google Drive.
+
+**** Implementation
+
+Two scripts added to ~src/periodical_distiller/~:
+
+- ~generate-sips-from-pips.py~ :: Scans ~workspace/pips/~, runs each PIP
+  through the full pipeline (~Orchestrator~: HTML → PDF → ALTO → MODS →
+  Image → METS → seal), and produces ~{date}-sip.zip~ in ~workspace/sips/~.
+  Resume-safe: skips dates whose zip already exists.
+
+- ~report-sip-sizes.py~ :: Produces ~workspace/sip-size-report.csv~ with one
+  row per issue date showing PIP size, SIP directory size, and compressed SIP
+  zip size (in MB), plus GB totals.  Prepared for Esmé.
+
+Results from the 2026-07-01 run:
+
+| Metric | Value |
+|--------+-------|
+| PIPs processed | 807 |
+| SIP zips produced | 807 |
+| Total PIP footprint | 1.24 GB |
+| Total SIP footprint | 8.64 GB |
+| Total compressed (zip) | 7.67 GB |
+
+SIPs uploaded to Google Drive at
+~Daily Princetonian/sips~ (folder ID ~1CNt_jBoGNerL4xEDDtemejlSKSDCLn0e~)
+via ~rclone~ (remote: ~gdrive~, Princeton account).
+
 * Project Strawberry
 Placeholder for items related to generalising the architecture beyond the
 Daily Princetonian / CEO3 source.

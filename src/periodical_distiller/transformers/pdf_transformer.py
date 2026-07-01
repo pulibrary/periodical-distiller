@@ -88,9 +88,7 @@ class PDFTransformer(SIPTransformer):
 
         self._write_sip_manifest(sip_path, sip_manifest)
 
-        logger.info(
-            f"PDF transformation complete for SIP {sip_manifest.id}"
-        )
+        logger.info(f"PDF transformation complete for SIP {sip_manifest.id}")
         return sip_manifest
 
     def _load_sip_manifest(self, sip_path: Path) -> SIPManifest:
@@ -174,7 +172,5 @@ class PDFTransformer(SIPTransformer):
     def _write_sip_manifest(self, sip_path: Path, manifest: SIPManifest) -> None:
         """Write the updated SIP manifest to disk."""
         manifest_path = sip_path / "sip-manifest.json"
-        manifest_path.write_text(
-            manifest.model_dump_json(indent=2, exclude_none=True)
-        )
+        manifest_path.write_text(manifest.model_dump_json(indent=2, exclude_none=True))
         logger.debug(f"Wrote updated SIP manifest to {manifest_path}")

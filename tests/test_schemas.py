@@ -544,9 +544,7 @@ class TestSIPManifest:
                 SIPArticle(
                     ceo_id="12345",
                     html_path="articles/12345/article.html",
-                    pages=[
-                        SIPPage(page_number=1, alto_path="articles/12345/001.alto.xml")
-                    ],
+                    pages=[SIPPage(page_number=1, alto_path="articles/12345/001.alto.xml")],
                 )
             ],
             mets_path="mets.xml",

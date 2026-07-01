@@ -94,9 +94,7 @@ class PIPManifest(BaseModel):
     title: str
     date_range: tuple[str, str]
     articles: list[PIPArticle] = []
-    pdi: PreservationDescriptionInfo = Field(
-        default_factory=PreservationDescriptionInfo
-    )
+    pdi: PreservationDescriptionInfo = Field(default_factory=PreservationDescriptionInfo)
     status: Literal["building", "sealed"] = "building"
 
     model_config = {"extra": "allow"}

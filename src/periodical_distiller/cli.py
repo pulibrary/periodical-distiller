@@ -64,9 +64,7 @@ def harvest_pip(args: argparse.Namespace) -> int:
 
     try:
         with CeoClient(config) as client:
-            with PIPAggregator(
-                output_dir, client, download_media=not args.no_media
-            ) as aggregator:
+            with PIPAggregator(output_dir, client, download_media=not args.no_media) as aggregator:
                 if args.date is not None:
                     logger.info(f"Fetching articles for {args.date}")
                     manifest = aggregator.create_pip_for_date(args.date)
@@ -288,10 +286,7 @@ def transform_image(args: argparse.Namespace) -> int:
         transformer = ImageTransformer()
         manifest = transformer.transform(sip_path)
 
-        image_count = sum(
-            sum(1 for p in a.pages if p.image_path)
-            for a in manifest.articles
-        )
+        image_count = sum(sum(1 for p in a.pages if p.image_path) for a in manifest.articles)
         logger.info(f"Transformed SIP: {manifest.id}")
         logger.info(f"  Images generated: {image_count}")
         logger.info(f"  Output: {sip_path}")
@@ -419,7 +414,8 @@ def main(argv: list[str] | None = None) -> int:
     # conventional position (e.g. `harvest-pip -v --date 2026-01-29`).
     verbose_parser = argparse.ArgumentParser(add_help=False)
     verbose_parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="Enable verbose output",
     )

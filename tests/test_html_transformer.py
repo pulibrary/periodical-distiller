@@ -111,21 +111,21 @@ class TestParseMediaCaption:
 
     def test_parse_caption_and_credit(self):
         """Extracts both caption and credit from content."""
-        content = '<h5>A beautiful photo.</h5><h6>John Doe / Daily Prince</h6>'
+        content = "<h5>A beautiful photo.</h5><h6>John Doe / Daily Prince</h6>"
         result = parse_media_caption(content)
         assert result["caption"] == "A beautiful photo."
         assert result["credit"] == "John Doe / Daily Prince"
 
     def test_parse_caption_only(self):
         """Extracts caption when no credit present."""
-        content = '<h5>Just a caption</h5>'
+        content = "<h5>Just a caption</h5>"
         result = parse_media_caption(content)
         assert result["caption"] == "Just a caption"
         assert result["credit"] == ""
 
     def test_parse_credit_only(self):
         """Extracts credit when no caption present."""
-        content = '<h6>Photo by Jane</h6>'
+        content = "<h6>Photo by Jane</h6>"
         result = parse_media_caption(content)
         assert result["caption"] == ""
         assert result["credit"] == "Photo by Jane"
@@ -144,7 +144,7 @@ class TestParseMediaCaption:
 
     def test_parse_strips_whitespace(self):
         """Strips whitespace from extracted values."""
-        content = '<h5>  Caption with spaces  </h5><h6>  Credit  </h6>'
+        content = "<h5>  Caption with spaces  </h5><h6>  Credit  </h6>"
         result = parse_media_caption(content)
         assert result["caption"] == "Caption with spaces"
         assert result["credit"] == "Credit"
@@ -242,12 +242,16 @@ def sample_pip_structure(tmp_path):
         "hits": "100",
         "metadata": [],
         "normalized_tags": "",
-        "tags": [{"id": "1",
-                  "uuid": "t1",
-                  "name": "news",
-                  "slug": "news",
-                  "ceo_id": "1",
-                  "metadata": None}],
+        "tags": [
+            {
+                "id": "1",
+                "uuid": "t1",
+                "name": "news",
+                "slug": "news",
+                "ceo_id": "1",
+                "metadata": None,
+            }
+        ],
         "authors": [
             {
                 "id": "a1",
@@ -318,14 +322,14 @@ def sample_pip_with_flourish(tmp_path):
         "subhead": None,
         "abstract": None,
         "content": (
-            '<p>Before chart</p>'
+            "<p>Before chart</p>"
             '<figure><div class="embed-code">'
             '<div class="flourish-embed flourish-chart" data-src="visualisation/12345678">'
             '<script src="https://public.flourish.studio/resources/embed.js"></script>'
             '<noscript><img src="https://public.flourish.studio/visualisation/12345678/thumbnail" '
             'width="100%" alt="chart visualization" /></noscript>'
-            '</div></div></figure>'
-            '<p>After chart</p>'
+            "</div></div></figure>"
+            "<p>After chart</p>"
         ),
         "infobox": None,
         "seo_title": None,
@@ -589,15 +593,13 @@ class TestHTMLTransformerTransform:
 
         html_path = sip_dir / "articles" / "12345" / "article.html"
         content = html_path.read_text()
-        assert '../../article.css' in content
+        assert "../../article.css" in content
 
 
 class TestHTMLTransformerFlourishEmbeds:
     """Tests for Flourish embed replacement."""
 
-    def test_transform_replaces_flourish_with_local_image(
-        self, sample_pip_with_flourish, tmp_path
-    ):
+    def test_transform_replaces_flourish_with_local_image(self, sample_pip_with_flourish, tmp_path):
         """transform() replaces Flourish embeds with local chart images."""
         sip_dir = tmp_path / "sips" / "2026-01-30"
 
@@ -609,8 +611,8 @@ class TestHTMLTransformerFlourishEmbeds:
 
         assert "flourish-embed" not in content
         assert "data-src" not in content
-        assert '<script' not in content.lower() or "embed.js" not in content
-        assert 'charts/flourish-12345678.png' in content
+        assert "<script" not in content.lower() or "embed.js" not in content
+        assert "charts/flourish-12345678.png" in content
         assert 'class="chart-image"' in content
 
     def test_transform_copies_chart_images(self, sample_pip_with_flourish, tmp_path):
@@ -636,24 +638,22 @@ class TestHTMLTransformerFlourishEmbeds:
         ]
 
         content = (
-            '<p>Before</p>'
+            "<p>Before</p>"
             '<div class="flourish-embed" data-src="visualisation/99999">stuff</div>'
-            '<p>After</p>'
+            "<p>After</p>"
         )
 
         result = transformer._replace_flourish_embeds(content, media, "1")
 
         assert "<p>Before</p>" in result
         assert "<p>After</p>" in result
-        assert 'charts/flourish-99999.png' in result
+        assert "charts/flourish-99999.png" in result
 
 
 class TestHTMLTransformerFeaturedImage:
     """Tests for dominant media / featured image rendering."""
 
-    def test_transform_includes_featured_image(
-        self, sample_pip_with_dominant_media, tmp_path
-    ):
+    def test_transform_includes_featured_image(self, sample_pip_with_dominant_media, tmp_path):
         """transform() includes featured image in HTML output."""
         sip_dir = tmp_path / "sips" / "2026-01-31"
 
@@ -664,11 +664,9 @@ class TestHTMLTransformerFeaturedImage:
         content = html_path.read_text()
 
         assert 'class="featured-image"' in content
-        assert 'images/featured-photo.jpg' in content
+        assert "images/featured-photo.jpg" in content
 
-    def test_transform_includes_image_caption(
-        self, sample_pip_with_dominant_media, tmp_path
-    ):
+    def test_transform_includes_image_caption(self, sample_pip_with_dominant_media, tmp_path):
         """transform() includes caption from dominant media content."""
         sip_dir = tmp_path / "sips" / "2026-01-31"
 
@@ -681,9 +679,7 @@ class TestHTMLTransformerFeaturedImage:
         assert 'class="image-caption"' in content
         assert "View of campus from the library." in content
 
-    def test_transform_includes_image_credit(
-        self, sample_pip_with_dominant_media, tmp_path
-    ):
+    def test_transform_includes_image_credit(self, sample_pip_with_dominant_media, tmp_path):
         """transform() includes credit from dominant media content."""
         sip_dir = tmp_path / "sips" / "2026-01-31"
 
@@ -826,11 +822,13 @@ class TestHTMLTransformerErrorHandling:
 
         manifest_path = pip_dir / "pip-manifest.json"
         manifest_data = json.loads(manifest_path.read_text())
-        manifest_data["articles"].append({
-            "ceo_id": "broken",
-            "ceo_record_path": "articles/broken/ceo_record.json",
-            "media": [],
-        })
+        manifest_data["articles"].append(
+            {
+                "ceo_id": "broken",
+                "ceo_record_path": "articles/broken/ceo_record.json",
+                "media": [],
+            }
+        )
         manifest_path.write_text(json.dumps(manifest_data, indent=2))
 
         sip_dir = tmp_path / "sips" / "2026-01-29"

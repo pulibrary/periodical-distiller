@@ -65,9 +65,7 @@ class ImageTransformer(SIPTransformer):
             try:
                 self._transform_article(sip_path, article)
             except Exception as e:
-                logger.error(
-                    f"Failed to generate images for article {article.ceo_id}: {e}"
-                )
+                logger.error(f"Failed to generate images for article {article.ceo_id}: {e}")
                 sip_manifest.validation_errors.append(
                     f"Image generation failed for {article.ceo_id}: {e}"
                 )
@@ -114,8 +112,7 @@ class ImageTransformer(SIPTransformer):
 
                 page_info.image_path = img_rel
                 logger.debug(
-                    f"Wrote image for article {article.ceo_id} "
-                    f"page {page_info.page_number}"
+                    f"Wrote image for article {article.ceo_id} page {page_info.page_number}"
                 )
         finally:
             doc.close()
@@ -123,7 +120,5 @@ class ImageTransformer(SIPTransformer):
     def _write_sip_manifest(self, sip_path: Path, manifest: SIPManifest) -> None:
         """Write the updated SIP manifest to disk."""
         manifest_path = sip_path / "sip-manifest.json"
-        manifest_path.write_text(
-            manifest.model_dump_json(indent=2, exclude_none=True)
-        )
+        manifest_path.write_text(manifest.model_dump_json(indent=2, exclude_none=True))
         logger.debug(f"Wrote updated SIP manifest to {manifest_path}")

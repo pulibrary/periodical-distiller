@@ -14,6 +14,7 @@ from schemas.sip import SIPArticle, SIPManifest, SIPPage
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_pdf(path: Path, pages: list[list[str]]) -> None:
     """Write a minimal PDF with text to *path*.
 
@@ -43,6 +44,7 @@ def _alto_tag(local: str) -> str:
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def sip_with_pdf(tmp_path: Path) -> Path:
@@ -137,6 +139,7 @@ def sip_multiple_articles(tmp_path: Path) -> Path:
 # Tests: Initialization
 # ---------------------------------------------------------------------------
 
+
 class TestALTOTransformerInit:
     def test_instantiation(self):
         """ALTOTransformer can be instantiated with no arguments."""
@@ -147,6 +150,7 @@ class TestALTOTransformerInit:
 # ---------------------------------------------------------------------------
 # Tests: transform() – file creation
 # ---------------------------------------------------------------------------
+
 
 class TestALTOTransformerTransform:
     def test_transform_creates_alto_file(self, sip_with_pdf):
@@ -185,6 +189,7 @@ class TestALTOTransformerTransform:
 # ---------------------------------------------------------------------------
 # Tests: ALTO XML structure
 # ---------------------------------------------------------------------------
+
 
 class TestALTOXMLStructure:
     def test_alto_root_element(self, sip_with_pdf):
@@ -301,6 +306,7 @@ class TestALTOXMLStructure:
 # Tests: Error handling
 # ---------------------------------------------------------------------------
 
+
 class TestALTOTransformerErrorHandling:
     def test_skips_article_without_pdf_path(self, tmp_path):
         """transform() skips articles that have no pdf_path."""
@@ -410,6 +416,7 @@ class TestALTOTransformerErrorHandling:
 # Tests: Internal helpers
 # ---------------------------------------------------------------------------
 
+
 class TestALTOTransformerHelpers:
     def test_union_bbox(self):
         """_union_bbox() returns the correct outer bounds."""
@@ -471,6 +478,7 @@ class TestALTOTransformerHelpers:
 # ---------------------------------------------------------------------------
 # Tests: _merge_nearby_blocks()
 # ---------------------------------------------------------------------------
+
 
 def _make_block(x0, y0, x1, y1, words=None):
     """Minimal (block_bbox, lines) pair for testing _merge_nearby_blocks."""

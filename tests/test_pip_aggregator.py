@@ -146,9 +146,7 @@ class TestPIPAggregatorCreatePIP:
             assert article_dir.exists()
             assert (article_dir / "ceo_record.json").exists()
 
-    def test_create_pip_saves_ceo_records(
-        self, tmp_path, mock_ceo_client, sample_ceo_items
-    ):
+    def test_create_pip_saves_ceo_records(self, tmp_path, mock_ceo_client, sample_ceo_items):
         """create_pip() saves CEO records as JSON."""
         aggregator = PIPAggregator(tmp_path, mock_ceo_client)
 
@@ -160,19 +158,13 @@ class TestPIPAggregatorCreatePIP:
         )
 
         record_path = (
-            tmp_path
-            / "2026-01-15"
-            / "articles"
-            / sample_ceo_items[0].ceo_id
-            / "ceo_record.json"
+            tmp_path / "2026-01-15" / "articles" / sample_ceo_items[0].ceo_id / "ceo_record.json"
         )
         record_data = json.loads(record_path.read_text())
         assert record_data["headline"] == sample_ceo_items[0].headline
         assert record_data["ceo_id"] == sample_ceo_items[0].ceo_id
 
-    def test_create_pip_returns_manifest(
-        self, tmp_path, mock_ceo_client, sample_ceo_items
-    ):
+    def test_create_pip_returns_manifest(self, tmp_path, mock_ceo_client, sample_ceo_items):
         """create_pip() returns a PIPManifest."""
         aggregator = PIPAggregator(tmp_path, mock_ceo_client)
 
@@ -190,9 +182,7 @@ class TestPIPAggregatorCreatePIP:
         assert len(manifest.articles) == 3
         assert manifest.status == "sealed"
 
-    def test_create_pip_writes_manifest_file(
-        self, tmp_path, mock_ceo_client, sample_ceo_items
-    ):
+    def test_create_pip_writes_manifest_file(self, tmp_path, mock_ceo_client, sample_ceo_items):
         """create_pip() writes manifest to pip-manifest.json."""
         aggregator = PIPAggregator(tmp_path, mock_ceo_client)
 
@@ -209,9 +199,7 @@ class TestPIPAggregatorCreatePIP:
         assert manifest_data["title"] == "Test Issue"
         assert len(manifest_data["articles"]) == 3
 
-    def test_create_pip_sets_pdi_fields(
-        self, tmp_path, mock_ceo_client, sample_ceo_items
-    ):
+    def test_create_pip_sets_pdi_fields(self, tmp_path, mock_ceo_client, sample_ceo_items):
         """create_pip() populates preservation description info."""
         aggregator = PIPAggregator(tmp_path, mock_ceo_client)
 
@@ -263,9 +251,7 @@ class TestPIPAggregatorCreatePIP:
 class TestPIPAggregatorCreatePIPForDate:
     """Tests for PIPAggregator.create_pip_for_date() method."""
 
-    def test_create_pip_for_date_calls_client(
-        self, tmp_path, mock_ceo_client, sample_ceo_items
-    ):
+    def test_create_pip_for_date_calls_client(self, tmp_path, mock_ceo_client, sample_ceo_items):
         """create_pip_for_date() fetches articles via client."""
         mock_ceo_client.fetch_by_date = MagicMock(return_value=sample_ceo_items)
         aggregator = PIPAggregator(tmp_path, mock_ceo_client)
@@ -286,9 +272,7 @@ class TestPIPAggregatorCreatePIPForDate:
         assert manifest.id == "2026-01-15"
         assert (tmp_path / "2026-01-15").exists()
 
-    def test_create_pip_for_date_sets_title(
-        self, tmp_path, mock_ceo_client, sample_ceo_items
-    ):
+    def test_create_pip_for_date_sets_title(self, tmp_path, mock_ceo_client, sample_ceo_items):
         """create_pip_for_date() generates appropriate title."""
         mock_ceo_client.fetch_by_date = MagicMock(return_value=sample_ceo_items)
         aggregator = PIPAggregator(tmp_path, mock_ceo_client)
@@ -298,9 +282,7 @@ class TestPIPAggregatorCreatePIPForDate:
         assert "Daily Princetonian" in manifest.title
         assert "January 15, 2026" in manifest.title
 
-    def test_create_pip_for_date_sets_date_range(
-        self, tmp_path, mock_ceo_client, sample_ceo_items
-    ):
+    def test_create_pip_for_date_sets_date_range(self, tmp_path, mock_ceo_client, sample_ceo_items):
         """create_pip_for_date() sets matching start and end dates."""
         mock_ceo_client.fetch_by_date = MagicMock(return_value=sample_ceo_items)
         aggregator = PIPAggregator(tmp_path, mock_ceo_client)
@@ -333,9 +315,7 @@ class TestPIPAggregatorCreatePIPForDateRange:
         mock_ceo_client.fetch_by_date_range = MagicMock(return_value=sample_ceo_items)
         aggregator = PIPAggregator(tmp_path, mock_ceo_client)
 
-        manifest = aggregator.create_pip_for_date_range(
-            date(2026, 1, 15), date(2026, 1, 17)
-        )
+        manifest = aggregator.create_pip_for_date_range(date(2026, 1, 15), date(2026, 1, 17))
 
         assert manifest.id == "2026-01-15_to_2026-01-17"
         assert (tmp_path / "2026-01-15_to_2026-01-17").exists()
@@ -347,9 +327,7 @@ class TestPIPAggregatorCreatePIPForDateRange:
         mock_ceo_client.fetch_by_date_range = MagicMock(return_value=sample_ceo_items)
         aggregator = PIPAggregator(tmp_path, mock_ceo_client)
 
-        manifest = aggregator.create_pip_for_date_range(
-            date(2026, 1, 15), date(2026, 1, 17)
-        )
+        manifest = aggregator.create_pip_for_date_range(date(2026, 1, 15), date(2026, 1, 17))
 
         assert "Daily Princetonian" in manifest.title
         assert "January 15, 2026" in manifest.title
@@ -362,9 +340,7 @@ class TestPIPAggregatorCreatePIPForDateRange:
         mock_ceo_client.fetch_by_date_range = MagicMock(return_value=sample_ceo_items)
         aggregator = PIPAggregator(tmp_path, mock_ceo_client)
 
-        manifest = aggregator.create_pip_for_date_range(
-            date(2026, 1, 15), date(2026, 1, 17)
-        )
+        manifest = aggregator.create_pip_for_date_range(date(2026, 1, 15), date(2026, 1, 17))
 
         assert manifest.date_range == ("2026-01-15", "2026-01-17")
 
@@ -382,9 +358,7 @@ class TestPIPAggregatorMediaDownload:
         aggregator = PIPAggregator(tmp_path, mock_ceo_client, download_media=False)
         assert aggregator.download_media is False
 
-    def test_init_accepts_media_downloader(
-        self, tmp_path, mock_ceo_client, mock_media_downloader
-    ):
+    def test_init_accepts_media_downloader(self, tmp_path, mock_ceo_client, mock_media_downloader):
         """PIPAggregator accepts injected MediaDownloader."""
         aggregator = PIPAggregator(
             tmp_path, mock_ceo_client, media_downloader=mock_media_downloader

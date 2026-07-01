@@ -180,11 +180,13 @@ class TestClientRetryLogic:
     @patch("periodical_distiller.clients.client.sleep")
     def test_retries_on_connection_error(self, mock_sleep):
         """Client retries on connection errors."""
-        client = ConcreteClient({
-            "base_url": "https://api.example.com",
-            "retry_attempts": 3,
-            "retry_delay": 0.1,
-        })
+        client = ConcreteClient(
+            {
+                "base_url": "https://api.example.com",
+                "retry_attempts": 3,
+                "retry_delay": 0.1,
+            }
+        )
 
         mock_http_client = MagicMock()
         mock_http_client.request.side_effect = httpx.ConnectError("Connection refused")
@@ -200,11 +202,13 @@ class TestClientRetryLogic:
     @patch("periodical_distiller.clients.client.sleep")
     def test_retries_on_timeout(self, mock_sleep):
         """Client retries on timeout errors."""
-        client = ConcreteClient({
-            "base_url": "https://api.example.com",
-            "retry_attempts": 2,
-            "retry_delay": 0.1,
-        })
+        client = ConcreteClient(
+            {
+                "base_url": "https://api.example.com",
+                "retry_attempts": 2,
+                "retry_delay": 0.1,
+            }
+        )
 
         mock_http_client = MagicMock()
         mock_http_client.request.side_effect = httpx.TimeoutException("Request timed out")
@@ -218,10 +222,12 @@ class TestClientRetryLogic:
     @patch("periodical_distiller.clients.client.sleep")
     def test_succeeds_after_retry(self, mock_sleep):
         """Client succeeds if retry works."""
-        client = ConcreteClient({
-            "base_url": "https://api.example.com",
-            "retry_attempts": 3,
-        })
+        client = ConcreteClient(
+            {
+                "base_url": "https://api.example.com",
+                "retry_attempts": 3,
+            }
+        )
 
         success_response = MagicMock()
         success_response.is_success = True
@@ -240,10 +246,12 @@ class TestClientRetryLogic:
 
     def test_no_retry_on_api_error(self):
         """Client does not retry on API errors (non-transient)."""
-        client = ConcreteClient({
-            "base_url": "https://api.example.com",
-            "retry_attempts": 3,
-        })
+        client = ConcreteClient(
+            {
+                "base_url": "https://api.example.com",
+                "retry_attempts": 3,
+            }
+        )
 
         error_response = MagicMock()
         error_response.is_success = False

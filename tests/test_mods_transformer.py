@@ -14,6 +14,7 @@ from schemas.sip import SIPArticle, SIPManifest
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _mods_tag(local: str) -> str:
     return f"{{{MODS_NS}}}{local}"
 
@@ -25,6 +26,7 @@ def _parse_mods(path: Path) -> etree._Element:
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def pip_and_sip(tmp_path, sample_ceo_record):
@@ -70,10 +72,26 @@ def pip_and_sip_two_articles(tmp_path, sample_ceo_record):
     pip_dir = tmp_path / "pips" / "2026-01-30"
 
     records = [
-        ("11111", {**sample_ceo_record, "id": "11111", "ceo_id": "11111",
-                   "headline": "First Article", "uuid": "uuid-11111"}),
-        ("22222", {**sample_ceo_record, "id": "22222", "ceo_id": "22222",
-                   "headline": "Second Article", "uuid": "uuid-22222"}),
+        (
+            "11111",
+            {
+                **sample_ceo_record,
+                "id": "11111",
+                "ceo_id": "11111",
+                "headline": "First Article",
+                "uuid": "uuid-11111",
+            },
+        ),
+        (
+            "22222",
+            {
+                **sample_ceo_record,
+                "id": "22222",
+                "ceo_id": "22222",
+                "headline": "Second Article",
+                "uuid": "uuid-22222",
+            },
+        ),
     ]
 
     pip_articles = []
@@ -81,10 +99,12 @@ def pip_and_sip_two_articles(tmp_path, sample_ceo_record):
         art_dir = pip_dir / "articles" / ceo_id
         art_dir.mkdir(parents=True)
         (art_dir / "ceo_record.json").write_text(json.dumps(record))
-        pip_articles.append(PIPArticle(
-            ceo_id=ceo_id,
-            ceo_record_path=f"articles/{ceo_id}/ceo_record.json",
-        ))
+        pip_articles.append(
+            PIPArticle(
+                ceo_id=ceo_id,
+                ceo_record_path=f"articles/{ceo_id}/ceo_record.json",
+            )
+        )
 
     pip_manifest = PIPManifest(
         id="2026-01-30",
@@ -116,6 +136,7 @@ def pip_and_sip_two_articles(tmp_path, sample_ceo_record):
 # Tests: Initialization
 # ---------------------------------------------------------------------------
 
+
 class TestMODSTransformerInit:
     def test_instantiation(self):
         """MODSTransformer can be instantiated with no arguments."""
@@ -126,6 +147,7 @@ class TestMODSTransformerInit:
 # ---------------------------------------------------------------------------
 # Tests: transform() – file creation and manifest updates
 # ---------------------------------------------------------------------------
+
 
 class TestMODSTransformerTransform:
     def test_transform_creates_mods_file(self, pip_and_sip):
@@ -176,6 +198,7 @@ class TestMODSTransformerTransform:
 # ---------------------------------------------------------------------------
 # Tests: MODS XML structure
 # ---------------------------------------------------------------------------
+
 
 class TestMODSXMLStructure:
     def test_mods_root_element(self, pip_and_sip):
@@ -259,6 +282,7 @@ class TestMODSXMLStructure:
 # Tests: Metadata mapping (CEO → MODS values)
 # ---------------------------------------------------------------------------
 
+
 class TestMODSMetadataMapping:
     def test_headline_mapped_to_title(self, pip_and_sip, sample_ceo_record):
         """Headline is mapped to <mods:title> text."""
@@ -282,10 +306,7 @@ class TestMODSMetadataMapping:
         _pip_dir, sip_dir = pip_and_sip
         MODSTransformer().transform(sip_dir)
         root = _parse_mods(sip_dir / "articles" / "12345" / "article.mods.xml")
-        name_parts = [
-            el.text
-            for el in root.findall(f".//{_mods_tag('namePart')}")
-        ]
+        name_parts = [el.text for el in root.findall(f".//{_mods_tag('namePart')}")]
         expected_names = [a["name"] for a in sample_ceo_record["authors"]]
         for name in expected_names:
             assert name in name_parts
@@ -315,8 +336,7 @@ class TestMODSMetadataMapping:
         MODSTransformer().transform(sip_dir)
         root = _parse_mods(sip_dir / "articles" / "12345" / "article.mods.xml")
         ceo_id_el = next(
-            el for el in root.findall(_mods_tag("identifier"))
-            if el.get("type") == "ceo-id"
+            el for el in root.findall(_mods_tag("identifier")) if el.get("type") == "ceo-id"
         )
         assert ceo_id_el.text == sample_ceo_record["ceo_id"]
 
@@ -326,8 +346,7 @@ class TestMODSMetadataMapping:
         MODSTransformer().transform(sip_dir)
         root = _parse_mods(sip_dir / "articles" / "12345" / "article.mods.xml")
         uuid_el = next(
-            el for el in root.findall(_mods_tag("identifier"))
-            if el.get("type") == "uuid"
+            el for el in root.findall(_mods_tag("identifier")) if el.get("type") == "uuid"
         )
         assert uuid_el.text == sample_ceo_record["uuid"]
 
@@ -417,6 +436,7 @@ class TestMODSMetadataMapping:
 # ---------------------------------------------------------------------------
 # Tests: Error handling
 # ---------------------------------------------------------------------------
+
 
 class TestMODSTransformerErrorHandling:
     def test_missing_pip_path_raises_error(self, tmp_path):
@@ -547,6 +567,7 @@ class TestMODSTransformerErrorHandling:
 # ---------------------------------------------------------------------------
 # Tests: Internal helpers
 # ---------------------------------------------------------------------------
+
 
 class TestMODSTransformerHelpers:
     def test_strip_html_removes_tags(self):

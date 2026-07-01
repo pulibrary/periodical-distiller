@@ -52,9 +52,7 @@ class Token:
     def name(self) -> str | None:
         return self.get_prop("id")
 
-    def write_log(
-        self, message: str, level: Optional[str] = None, stage: Optional[str] = None
-    ):
+    def write_log(self, message: str, level: Optional[str] = None, stage: Optional[str] = None):
         """Add a log entry to the token's processing history.
 
         Args:
@@ -308,9 +306,7 @@ class Filter(ABC):
         Sets a flag to request shutdown after the current token completes
         processing. This ensures tokens are not left in an inconsistent state.
         """
-        logger.info(
-            f"{self.stage_name}: Shutdown signal received, will exit after current token"
-        )
+        logger.info(f"{self.stage_name}: Shutdown signal received, will exit after current token")
         self.shutdown_requested = True
 
     def _recover_orphaned_tokens(self) -> None:
@@ -323,8 +319,7 @@ class Filter(ABC):
         for bak_file in self.pipe.input.glob("*.bak"):
             json_file = bak_file.with_suffix(".json")
             logger.warning(
-                f"{self.stage_name}: Recovering orphaned token: "
-                f"{bak_file.name} -> {json_file.name}"
+                f"{self.stage_name}: Recovering orphaned token: {bak_file.name} -> {json_file.name}"
             )
             bak_file.rename(json_file)
 

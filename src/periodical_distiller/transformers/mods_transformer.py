@@ -46,8 +46,7 @@ class MODSTransformer(SIPTransformer):
         """
         sip_manifest = self._load_sip_manifest(sip_path)
         logger.info(
-            f"Transforming SIP {sip_manifest.id} with "
-            f"{len(sip_manifest.articles)} articles to MODS"
+            f"Transforming SIP {sip_manifest.id} with {len(sip_manifest.articles)} articles to MODS"
         )
 
         try:
@@ -228,7 +227,5 @@ class MODSTransformer(SIPTransformer):
     def _write_sip_manifest(self, sip_path: Path, manifest: SIPManifest) -> None:
         """Write the updated SIP manifest to disk."""
         manifest_path = sip_path / "sip-manifest.json"
-        manifest_path.write_text(
-            manifest.model_dump_json(indent=2, exclude_none=True)
-        )
+        manifest_path.write_text(manifest.model_dump_json(indent=2, exclude_none=True))
         logger.debug(f"Wrote updated SIP manifest to {manifest_path}")

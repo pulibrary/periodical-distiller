@@ -1,0 +1,78 @@
+
+#+begin_quote
+We have concluded our review of this for now.
+
+As I mentioned your METS/ALTO document did mostly ingest by default, but it ingested as page level METS/ALTO, not article-level (for more information on working on article-level matters for this data please see below).
+
+Note that we did change the directory structure so it didn't have two dates in it though, only the first date, in order for it to ingest, but we could customise Veridian to handle those two dates in your directory structure.
+
+Ingested as page-level currently:
+https://papersofprinceton.princeton.edu/staging/princetonperiodicals/cgi-bin/princetonperiodicals?a=d&d=PRINCETONIANONLINE20260201
+
+ * One of the differences between the logical structMap in your data and what we normally see is that typically all of the divs tend to have ID's: (e.g. ID="DIVL15"). So typical in fact that Veridian expects this, and the lack of IDs cause errors in Veridian by default when importing this data. However, we see that having ID's on those divs is optional in the schema, so if you wish, we could customise Veridian to not expect those ID's. One way Veridian uses these IDs is during ingestion as a reference to determine where in the METS something is going wrong.
+
+ * Another typical difference from Princetonian article-level METS/ALTO is that these Article div types don't have LABEL attributes. However, that should be fine, as you have provided the title metadata of the articles in MODS metadata which is associated with each article using DMDIDs, so we can determine what each article title is using those DMDIDs. There is code in Veridian to do this but for some reason it isn't working for this data so we would have to look further into why this is.
+
+ * We also noted that you have type='INSIDE' page-level div types in this data, instead of the default 'PAGE' type, but we assume there may be a good reason for this, so for now we added that to the Papers of Princeton collection configuration of accepted page-level div types.
+
+ * Probably the most important item to deal with next (in order to ingest the METS/ALTO as article-level as opposed to page-level) is ultimately associating the set of text blocks that make up each article with each article div in the Logical structMap. Currently you have:
+
+          <div TYPE="Article" DMDID="c0002" ORDER="2">
+            <fptr FILEID="PDF_73861"/>
+          </div>
+
+If we definitively know that every page of this data will only ever contain one article, i.e. there are no pages which contain the end of one article and the start of another article, then we can infer that all of the ALTO files in each article-level directory contain all the text blocks that make up that article, and customise the relevant Veridian code to ingest this.
+
+However, even this being the case, we believe it would be a lot clearer in the METS to at least list the ALTO FILEIDs for each article, inside each Article div type. This would also mean less complex customised code to ingest this data.
+
+Beyond this, it seems to us that there is sort of a judgement call to be made as to how much information is included in each article div type, in the Logical structMap:
+
+ * If you wanted to further include area tags listing all of the ALTO fileid's and text blocks associated with each article, that would handle the case if there are ever two articles on one page, and it would also mean that the article div types would more specifically define which exact text blocks make up which article.
+
+ * You are of course creating a necessarily different flavour of METS/ALTO for the online version of the Daily Princetonian than the print version of the Daily Princetonian. For what it's worth, it might be somewhat useful to compare the logical structMaps of the two flavors of METS/ALTO.
+
+For the print version of the Daily Princetonian, we have METS as follows:
+
+   1. Where each <div> has an ID,
+
+   2. Each article div type contains area tags which are used to determine which text blocks in which ALTO files make up each article, and
+
+   3. There is of course a different tree structure to the divs in this different kind of logical structMap.
+
+For clarity, again, we don't think that area tags necessarily have to appear in the logical structMap for the online flavor of METS/ALTO you are developing, but we do believe that (assuming more than one article will never appear on one single page), it would be best to at least list the associated ALTO FILEIDs in each article divtype.
+
+https://papersofprinceton.princeton.edu/princetonperiodicals/custom/princetonperiodicals/web/dailyprincetonian_20240329_mets.xml
+<structMap xmlns="http://www.loc.gov/METS/" LABEL="Logical Structure" TYPE="LOGICAL">
+<div ID="DIVL1" TYPE="Newspaper" LABEL="The Daily Princetonian no. 8 29.03.2024">
+<div ID="DIVL2" TYPE="VOLUME" LABEL="The Daily Princetonian no. 8 29.03.2024">
+<div ID="DIVL3" TYPE="ISSUE" DMDID="ISSUE_DESCRIPTION" LABEL="The Daily Princetonian no. 8 29.03.2024">
+<div ID="DIVL4" TYPE="TITLE_SECTION">
+...
+</div>
+<div ID="DIVL10" TYPE="CONTENT">
+<div ID="DIVL11" TYPE="ARTICLE" DMDID="MODSMD_ARTICLE1" LABEL="ON CAMPUS Preliminary Fall 2024 course offerings leaked on Fizz three days early">
+<div ID="DIVL12" TYPE="HEADING">
+<div ID="DIVL13" TYPE="TITLE">
+<fptr>
+<seq>
+<area BETYPE="IDREF" FILEID="ALTO00001" BEGIN="P1_TB00006"/>
+<area BETYPE="IDREF" FILEID="ALTO00001" BEGIN="P1_TB00007"/>
+</seq>
+</fptr>
+</div>
+</div>
+<div ID="DIVL14" TYPE="BODY">
+<div ID="DIVL15" TYPE="BODY_CONTENT">
+<div ID="DIVL16" TYPE="PARAGRAPH" ORDER="1">
+<div ID="DIVL17" TYPE="TEXT">
+<fptr>
+<seq>
+<area BETYPE="IDREF" FILEID="ALTO00001" BEGIN="P1_TB00008"/>
+<area BETYPE="IDREF" FILEID="ALTO00001" BEGIN="P1_TB00009"/>
+<area BETYPE="IDREF" FILEID="ALTO00001" BEGIN="P1_TB00010"/>
+<area BETYPE="IDREF" FILEID="ALTO00003" BEGIN="P3_TB00001"/>
+</seq>
+</fptr>
+</div>
+</div>
+#+end_quote

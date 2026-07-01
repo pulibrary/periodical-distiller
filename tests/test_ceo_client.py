@@ -340,9 +340,7 @@ class TestCeoClientDateMinSkip:
         valid2["published_at"] = "2026-01-15 14:00:00"
 
         mock_http_client = MagicMock()
-        mock_http_client.request.return_value = make_ceo_response(
-            [valid1, null_date, valid2]
-        )
+        mock_http_client.request.return_value = make_ceo_response([valid1, null_date, valid2])
         client._client = mock_http_client
 
         import logging

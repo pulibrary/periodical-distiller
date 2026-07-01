@@ -100,9 +100,7 @@ class METSCompiler(Compiler):
     def _write_sip_manifest(self, sip_path: Path, manifest: SIPManifest) -> None:
         """Write the updated SIP manifest to disk."""
         manifest_path = sip_path / "sip-manifest.json"
-        manifest_path.write_text(
-            manifest.model_dump_json(indent=2, exclude_none=True)
-        )
+        manifest_path.write_text(manifest.model_dump_json(indent=2, exclude_none=True))
         logger.debug(f"Wrote updated SIP manifest to {manifest_path}")
 
     def _build_mets(
@@ -431,9 +429,7 @@ class METSCompiler(Compiler):
             logger.warning(f"Could not parse ALTO at {alto_path}: {e}")
             return []
 
-    def _global_pages(
-        self, sip_manifest: SIPManifest
-    ) -> list[tuple[SIPArticle, SIPPage, int]]:
+    def _global_pages(self, sip_manifest: SIPManifest) -> list[tuple[SIPArticle, SIPPage, int]]:
         """Generate globally-numbered pages across all articles.
 
         Iterates articles in manifest order, pages in page_number order,

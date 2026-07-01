@@ -106,9 +106,7 @@ class Orchestrator:
         for f in self.filters:
             processed = f.run_once()
             if not processed:
-                logger.warning(
-                    f"Filter {f.__class__.__name__} did not process token {token.name}"
-                )
+                logger.warning(f"Filter {f.__class__.__name__} did not process token {token.name}")
                 break
 
         return self._find_token(pip_manifest.id)

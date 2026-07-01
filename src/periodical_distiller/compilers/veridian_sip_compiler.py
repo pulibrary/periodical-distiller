@@ -45,7 +45,5 @@ class VeridianSIPCompiler(Compiler):
     def _write_sip_manifest(self, sip_path: Path, manifest: SIPManifest) -> None:
         """Write the sealed SIP manifest to disk."""
         manifest_path = sip_path / "sip-manifest.json"
-        manifest_path.write_text(
-            manifest.model_dump_json(indent=2, exclude_none=True)
-        )
+        manifest_path.write_text(manifest.model_dump_json(indent=2, exclude_none=True))
         logger.debug(f"Wrote sealed SIP manifest to {manifest_path}")

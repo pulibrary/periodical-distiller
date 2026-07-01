@@ -21,6 +21,7 @@ from schemas.sip import SIPArticle, SIPManifest
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_manifest(ceo_id: str = "12345", mets_path: str | None = None) -> SIPManifest:
     """Build a minimal SIPManifest for use in mock returns."""
     return SIPManifest(
@@ -42,6 +43,7 @@ def _seed_token(bucket: Path, token_id: str, props: dict) -> Path:
 # ---------------------------------------------------------------------------
 # Tests: HtmlFilter
 # ---------------------------------------------------------------------------
+
 
 class TestHtmlFilter:
     @pytest.fixture
@@ -199,6 +201,7 @@ class TestHtmlFilter:
 # Tests: PdfFilter
 # ---------------------------------------------------------------------------
 
+
 class TestPdfFilter:
     @pytest.fixture
     def buckets(self, tmp_path):
@@ -255,6 +258,7 @@ class TestPdfFilter:
 # Tests: AltoFilter
 # ---------------------------------------------------------------------------
 
+
 class TestAltoFilter:
     @pytest.fixture
     def buckets(self, tmp_path):
@@ -304,6 +308,7 @@ class TestAltoFilter:
 # ---------------------------------------------------------------------------
 # Tests: ModsFilter
 # ---------------------------------------------------------------------------
+
 
 class TestModsFilter:
     @pytest.fixture
@@ -355,6 +360,7 @@ class TestModsFilter:
 # Tests: ImageFilter
 # ---------------------------------------------------------------------------
 
+
 class TestImageFilter:
     @pytest.fixture
     def buckets(self, tmp_path):
@@ -405,6 +411,7 @@ class TestImageFilter:
 # Tests: SIPTransformerFilter — validation_errors propagation
 # ---------------------------------------------------------------------------
 
+
 class TestSIPTransformerFilterValidationErrors:
     """Verify that all SIPTransformerFilter subclasses propagate validation_errors.
 
@@ -441,6 +448,7 @@ class TestSIPTransformerFilterValidationErrors:
 # ---------------------------------------------------------------------------
 # Tests: MetsFilter
 # ---------------------------------------------------------------------------
+
 
 class TestMetsFilter:
     @pytest.fixture
@@ -522,6 +530,7 @@ class TestMetsFilter:
 # Tests: Orchestrator (integration)
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def minimal_pip(tmp_path, sample_ceo_record):
     """Minimal PIP fixture for Orchestrator integration test."""
@@ -556,6 +565,7 @@ class TestOrchestrator:
     def test_creates_all_bucket_dirs(self, tmp_path):
         """Orchestrator creates all BUCKET_NAMES directories under workspace."""
         from periodical_distiller.pipeline.orchestrator import BUCKET_NAMES
+
         workspace = tmp_path / "workspace"
         sip_output = tmp_path / "sips"
         Orchestrator(workspace=workspace, sip_output=sip_output)

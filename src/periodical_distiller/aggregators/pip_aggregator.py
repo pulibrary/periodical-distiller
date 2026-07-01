@@ -78,9 +78,7 @@ class PIPAggregator:
             article_dir.mkdir(exist_ok=True)
 
             ceo_record_path = article_dir / "ceo_record.json"
-            ceo_record_path.write_text(
-                article.model_dump_json(indent=2, by_alias=True)
-            )
+            ceo_record_path.write_text(article.model_dump_json(indent=2, by_alias=True))
 
             media_list = []
             if downloader is not None:
@@ -116,9 +114,7 @@ class PIPAggregator:
         manifest_path.write_text(manifest.model_dump_json(indent=2))
 
         if pip_articles:
-            logger.info(
-                f"Created PIP {issue_id} with {len(pip_articles)} articles at {pip_dir}"
-            )
+            logger.info(f"Created PIP {issue_id} with {len(pip_articles)} articles at {pip_dir}")
 
         return manifest
 
@@ -144,9 +140,7 @@ class PIPAggregator:
             articles=articles,
         )
 
-    def create_pip_for_date_range(
-        self, start: date, end: date
-    ) -> PIPManifest:
+    def create_pip_for_date_range(self, start: date, end: date) -> PIPManifest:
         """Fetch articles for date range and create PIP.
 
         Args:
@@ -160,8 +154,7 @@ class PIPAggregator:
         issue_id = f"{start.isoformat()}_to_{end.isoformat()}"
 
         title = (
-            f"The Daily Princetonian - "
-            f"{start.strftime('%B %d, %Y')} to {end.strftime('%B %d, %Y')}"
+            f"The Daily Princetonian - {start.strftime('%B %d, %Y')} to {end.strftime('%B %d, %Y')}"
         )
 
         return self.create_pip(

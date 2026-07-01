@@ -79,9 +79,7 @@ class MediaDownloader:
 
         # Download dominant media if present
         if article.dominant_media is not None:
-            dominant_media = self._download_dominant_media(
-                article, article_dir
-            )
+            dominant_media = self._download_dominant_media(article, article_dir)
             if dominant_media:
                 media_list.append(dominant_media)
         else:
@@ -140,9 +138,7 @@ class MediaDownloader:
                     checksum=checksum,
                 )
 
-                logger.debug(
-                    f"Downloaded media for article {article.ceo_id}: {filename}"
-                )
+                logger.debug(f"Downloaded media for article {article.ceo_id}: {filename}")
                 return pip_media
 
             except httpx.HTTPStatusError as e:
@@ -163,9 +159,7 @@ class MediaDownloader:
                 f"HTTP {last_error.response.status_code}"
             )
         elif last_error is not None:
-            logger.warning(
-                f"Failed to download media for article {article.ceo_id}: {last_error}"
-            )
+            logger.warning(f"Failed to download media for article {article.ceo_id}: {last_error}")
 
         return None
 
@@ -185,7 +179,7 @@ class MediaDownloader:
             return []
 
         # Match Flourish thumbnail URLs in noscript tags
-        pattern = r'https://public\.flourish\.studio/visualisation/(\d+)/thumbnail'
+        pattern = r"https://public\.flourish\.studio/visualisation/(\d+)/thumbnail"
         matches = re.findall(pattern, content)
 
         # Deduplicate while preserving order
@@ -243,9 +237,7 @@ class MediaDownloader:
                 )
 
                 media_list.append(pip_media)
-                logger.debug(
-                    f"Downloaded Flourish chart for article {article.ceo_id}: {filename}"
-                )
+                logger.debug(f"Downloaded Flourish chart for article {article.ceo_id}: {filename}")
 
             except httpx.HTTPStatusError as e:
                 logger.warning(
@@ -254,8 +246,7 @@ class MediaDownloader:
                 )
             except httpx.RequestError as e:
                 logger.warning(
-                    f"Failed to download Flourish chart {viz_id} for article "
-                    f"{article.ceo_id}: {e}"
+                    f"Failed to download Flourish chart {viz_id} for article {article.ceo_id}: {e}"
                 )
 
         return media_list

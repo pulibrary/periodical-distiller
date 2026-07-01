@@ -112,9 +112,7 @@ class HTMLTransformer(PIPTransformer):
                 sip_manifest.articles.append(sip_article)
             except Exception as e:
                 logger.error(f"Failed to transform article {pip_article.ceo_id}: {e}")
-                sip_manifest.validation_errors.append(
-                    f"Article {pip_article.ceo_id}: {e}"
-                )
+                sip_manifest.validation_errors.append(f"Article {pip_article.ceo_id}: {e}")
 
         sip_manifest.status = "sealed"
         self._write_sip_manifest(sip_path, sip_manifest)
@@ -166,9 +164,7 @@ class HTMLTransformer(PIPTransformer):
         images_dir = article_dir / "images"
         charts_dir = article_dir / "charts"
 
-        self._copy_article_media(
-            pip_path, pip_article, article_dir, images_dir, charts_dir
-        )
+        self._copy_article_media(pip_path, pip_article, article_dir, images_dir, charts_dir)
 
         content = self._replace_flourish_embeds(
             ceo_item.content or "",
@@ -176,9 +172,7 @@ class HTMLTransformer(PIPTransformer):
             ceo_id,
         )
 
-        featured_image_path = self._find_featured_image_path(
-            ceo_item, pip_article.media
-        )
+        featured_image_path = self._find_featured_image_path(ceo_item, pip_article.media)
 
         stylesheet_path = f"../../{self.stylesheet_name}"
         html_content = template.render(
@@ -294,7 +288,7 @@ class HTMLTransformer(PIPTransformer):
 
         pattern = re.compile(
             r'<div\s+class="flourish-embed[^"]*"\s+data-src="visualisation/(\d+)"[^>]*>'
-            r'.*?</div>',
+            r".*?</div>",
             re.DOTALL | re.IGNORECASE,
         )
 
@@ -306,7 +300,7 @@ class HTMLTransformer(PIPTransformer):
                 return (
                     f'<div class="chart-image">'
                     f'<img src="charts/{filename}" alt="Chart visualization">'
-                    f'</div>'
+                    f"</div>"
                 )
             return ""
 
@@ -315,17 +309,15 @@ class HTMLTransformer(PIPTransformer):
         figure_pattern = re.compile(
             r'<figure>\s*<div\s+class="embed-code">\s*'
             r'(<div\s+class="chart-image">.*?</div>)\s*'
-            r'</div>\s*</figure>',
+            r"</div>\s*</figure>",
             re.DOTALL,
         )
-        content = figure_pattern.sub(r'\1', content)
+        content = figure_pattern.sub(r"\1", content)
 
         return content
 
     def _write_sip_manifest(self, sip_path: Path, manifest: SIPManifest) -> None:
         """Write the SIP manifest to disk."""
         manifest_path = sip_path / "sip-manifest.json"
-        manifest_path.write_text(
-            manifest.model_dump_json(indent=2, exclude_none=True)
-        )
+        manifest_path.write_text(manifest.model_dump_json(indent=2, exclude_none=True))
         logger.debug(f"Wrote SIP manifest to {manifest_path}")

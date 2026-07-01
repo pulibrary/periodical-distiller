@@ -219,9 +219,7 @@ class TestGetMediaType:
 class TestDownloadArticleMedia:
     """Tests for MediaDownloader.download_article_media()."""
 
-    def test_download_article_media_no_dominant_media(
-        self, tmp_path, sample_ceo_item_no_media
-    ):
+    def test_download_article_media_no_dominant_media(self, tmp_path, sample_ceo_item_no_media):
         """Returns empty list when article has no dominant media."""
         downloader = MediaDownloader()
         article_dir = tmp_path / "articles" / "12345"
@@ -243,9 +241,7 @@ class TestDownloadArticleMedia:
         article_dir = tmp_path / "articles" / "12345"
         article_dir.mkdir(parents=True)
 
-        result = downloader.download_article_media(
-            sample_ceo_item_with_media, article_dir
-        )
+        result = downloader.download_article_media(sample_ceo_item_with_media, article_dir)
 
         assert len(result) == 1
         assert result[0].original_url == (
@@ -290,9 +286,7 @@ class TestDownloadArticleMedia:
         article_dir = tmp_path / "articles" / "12345"
         article_dir.mkdir(parents=True)
 
-        result = downloader.download_article_media(
-            sample_ceo_item_with_media, article_dir
-        )
+        result = downloader.download_article_media(sample_ceo_item_with_media, article_dir)
 
         assert result == []
 
@@ -307,9 +301,7 @@ class TestDownloadArticleMedia:
         article_dir = tmp_path / "articles" / "12345"
         article_dir.mkdir(parents=True)
 
-        result = downloader.download_article_media(
-            sample_ceo_item_with_media, article_dir
-        )
+        result = downloader.download_article_media(sample_ceo_item_with_media, article_dir)
 
         assert result == []
 
@@ -326,9 +318,7 @@ class TestDownloadArticleMedia:
         article_dir = tmp_path / "articles" / "12345"
         article_dir.mkdir(parents=True)
 
-        result = downloader.download_article_media(
-            sample_ceo_item_with_media, article_dir
-        )
+        result = downloader.download_article_media(sample_ceo_item_with_media, article_dir)
 
         expected_checksum = hashlib.sha256(test_content).hexdigest()
         assert result[0].checksum == expected_checksum
@@ -387,9 +377,7 @@ class TestDownloadArticleMedia:
         mock_success_response.content = b"fake png data"
 
         mock_http_client.get.side_effect = [
-            httpx.HTTPStatusError(
-                "Not Found", request=MagicMock(), response=mock_404_response
-            ),
+            httpx.HTTPStatusError("Not Found", request=MagicMock(), response=mock_404_response),
             mock_success_response,
         ]
 
@@ -544,9 +532,7 @@ class TestDownloadFlourishCharts:
         article_dir = tmp_path / "articles" / "12345"
         article_dir.mkdir(parents=True)
 
-        result = downloader._download_flourish_charts(
-            sample_article_with_flourish, article_dir
-        )
+        result = downloader._download_flourish_charts(sample_article_with_flourish, article_dir)
 
         assert len(result) == 1
         assert result[0].original_url == (
@@ -598,17 +584,13 @@ class TestDownloadFlourishCharts:
         assert result[0].local_path == "articles/12345/charts/flourish-11111111.png"
         assert result[1].local_path == "articles/12345/charts/flourish-22222222.png"
 
-    def test_download_flourish_charts_no_charts(
-        self, tmp_path, sample_ceo_item_no_media
-    ):
+    def test_download_flourish_charts_no_charts(self, tmp_path, sample_ceo_item_no_media):
         """Returns empty list when article has no Flourish charts."""
         downloader = MediaDownloader()
         article_dir = tmp_path / "articles" / "12345"
         article_dir.mkdir(parents=True)
 
-        result = downloader._download_flourish_charts(
-            sample_ceo_item_no_media, article_dir
-        )
+        result = downloader._download_flourish_charts(sample_ceo_item_no_media, article_dir)
 
         assert result == []
 
@@ -618,18 +600,14 @@ class TestDownloadFlourishCharts:
         """Returns empty list on HTTP error."""
         mock_response = MagicMock()
         mock_response.status_code = 404
-        error = httpx.HTTPStatusError(
-            "Not Found", request=MagicMock(), response=mock_response
-        )
+        error = httpx.HTTPStatusError("Not Found", request=MagicMock(), response=mock_response)
         mock_http_client.get.side_effect = error
 
         downloader = MediaDownloader(http_client=mock_http_client)
         article_dir = tmp_path / "articles" / "12345"
         article_dir.mkdir(parents=True)
 
-        result = downloader._download_flourish_charts(
-            sample_article_with_flourish, article_dir
-        )
+        result = downloader._download_flourish_charts(sample_article_with_flourish, article_dir)
 
         assert result == []
 

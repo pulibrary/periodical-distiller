@@ -146,9 +146,7 @@ class Client(ABC):
                     sleep(self.retry_delay)
             except httpx.TimeoutException as e:
                 last_exception = e
-                logger.warning(
-                    f"Timeout (attempt {attempt + 1}/{self.retry_attempts}): {e}"
-                )
+                logger.warning(f"Timeout (attempt {attempt + 1}/{self.retry_attempts}): {e}")
                 if attempt < self.retry_attempts - 1:
                     sleep(self.retry_delay)
 

@@ -21,8 +21,7 @@ def main() -> int:
     sip_dir = DEFAULT_SIP_DIR
 
     pip_paths = sorted(
-        p for p in pip_dir.iterdir()
-        if p.is_dir() and (p / "pip-manifest.json").exists()
+        p for p in pip_dir.iterdir() if p.is_dir() and (p / "pip-manifest.json").exists()
     )
 
     if not pip_paths:
@@ -46,15 +45,19 @@ def main() -> int:
             warnings += 1
             continue
 
-        rows.append({
-            "date": date,
-            "pip_size_mb": _dir_size_mb(pip_path),
-            "sip_size_mb": _dir_size_mb(sip_path),
-            "sip_zip_size_mb": round(zip_path.stat().st_size / (1024 * 1024), 2),
-        })
+        rows.append(
+            {
+                "date": date,
+                "pip_size_mb": _dir_size_mb(pip_path),
+                "sip_size_mb": _dir_size_mb(sip_path),
+                "sip_zip_size_mb": round(zip_path.stat().st_size / (1024 * 1024), 2),
+            }
+        )
 
     with OUTPUT_PATH.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["date", "pip_size_mb", "sip_size_mb", "sip_zip_size_mb"])
+        writer = csv.DictWriter(
+            f, fieldnames=["date", "pip_size_mb", "sip_size_mb", "sip_zip_size_mb"]
+        )
         writer.writeheader()
         writer.writerows(rows)
 

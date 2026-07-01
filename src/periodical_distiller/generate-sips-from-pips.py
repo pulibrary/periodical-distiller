@@ -34,8 +34,7 @@ def main() -> int:
         return 1
 
     pip_paths = sorted(
-        p for p in pip_dir.iterdir()
-        if p.is_dir() and (p / "pip-manifest.json").exists()
+        p for p in pip_dir.iterdir() if p.is_dir() and (p / "pip-manifest.json").exists()
     )
 
     if not pip_paths:
@@ -90,9 +89,7 @@ def main() -> int:
             logger.warning(f"  {pip_id}: failed — {e}")
             failed.append(pip_id)
 
-    logger.info(
-        f"\nDone. succeeded={succeeded}, skipped={skipped}, failed={len(failed)}"
-    )
+    logger.info(f"\nDone. succeeded={succeeded}, skipped={skipped}, failed={len(failed)}")
     if failed:
         logger.warning(f"Failed PIPs: {', '.join(failed)}")
         return 1

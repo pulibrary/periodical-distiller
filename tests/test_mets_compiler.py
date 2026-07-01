@@ -21,6 +21,7 @@ from schemas.sip import SIPArticle, SIPManifest, SIPPage
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _mets_tag(local: str) -> str:
     return f"{{{METS_NS}}}{local}"
 
@@ -89,6 +90,7 @@ def _make_mods_xml(title: str, authors: list[str]) -> bytes:
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def full_sip(tmp_path: Path) -> Path:
     """Fully populated SIP + PIP fixture.
@@ -122,18 +124,14 @@ def full_sip(tmp_path: Path) -> Path:
             )
         ],
     )
-    (pip_dir / "pip-manifest.json").write_text(
-        pip_manifest.model_dump_json(indent=2)
-    )
+    (pip_dir / "pip-manifest.json").write_text(pip_manifest.model_dump_json(indent=2))
 
     sip_dir = tmp_path / "sips" / "2026-01-29"
     article_dir = sip_dir / "articles" / "12345"
     article_dir.mkdir(parents=True)
 
     _make_pdf(article_dir / "article.pdf", pages=1)
-    (article_dir / "article.mods.xml").write_bytes(
-        _make_mods_xml("Test Headline", ["Jane Doe"])
-    )
+    (article_dir / "article.mods.xml").write_bytes(_make_mods_xml("Test Headline", ["Jane Doe"]))
     (article_dir / "001.alto.xml").write_bytes(_make_alto_xml(page_number=1, block_count=2))
 
     sip_manifest = SIPManifest(
@@ -155,9 +153,7 @@ def full_sip(tmp_path: Path) -> Path:
             )
         ],
     )
-    (sip_dir / "sip-manifest.json").write_text(
-        sip_manifest.model_dump_json(indent=2)
-    )
+    (sip_dir / "sip-manifest.json").write_text(sip_manifest.model_dump_json(indent=2))
     return sip_dir
 
 
@@ -233,6 +229,7 @@ def full_sip_two_articles(tmp_path: Path) -> Path:
 # Tests: Initialization
 # ---------------------------------------------------------------------------
 
+
 class TestMETSCompilerInit:
     def test_instantiation(self):
         """METSCompiler can be instantiated with no arguments."""
@@ -242,6 +239,7 @@ class TestMETSCompilerInit:
 # ---------------------------------------------------------------------------
 # Tests: compile() — file creation and manifest update
 # ---------------------------------------------------------------------------
+
 
 class TestMETSCompilerCompile:
     def test_compile_creates_mets_file(self, full_sip):
@@ -270,6 +268,7 @@ class TestMETSCompilerCompile:
 # ---------------------------------------------------------------------------
 # Tests: METS XML root structure
 # ---------------------------------------------------------------------------
+
 
 class TestMETSXMLStructure:
     def test_root_element_is_mets(self, full_sip):
@@ -373,6 +372,7 @@ class TestMETSXMLStructure:
 # Tests: fileSec contents
 # ---------------------------------------------------------------------------
 
+
 class TestMETSFileSec:
     def test_file_sec_has_altogrp(self, full_sip):
         """fileSec contains an ALTOGRP fileGrp."""
@@ -452,14 +452,14 @@ class TestMETSFileSec:
 # Tests: structMap contents
 # ---------------------------------------------------------------------------
 
+
 class TestMETSStructMaps:
     def test_physical_struct_map_has_page_div(self, full_sip):
         """Physical structMap has a DIVP1 div for the first page."""
         METSCompiler().compile(full_sip)
         root = _parse_mets(full_sip / "mets.xml")
         phys = next(
-            sm for sm in root.findall(_mets_tag("structMap"))
-            if sm.get("TYPE") == "PHYSICAL"
+            sm for sm in root.findall(_mets_tag("structMap")) if sm.get("TYPE") == "PHYSICAL"
         )
         divp = phys.find(f".//{_mets_tag('div')}[@ID='DIVP1']")
         assert divp is not None
@@ -478,8 +478,7 @@ class TestMETSStructMaps:
         METSCompiler().compile(full_sip)
         root = _parse_mets(full_sip / "mets.xml")
         logical = next(
-            sm for sm in root.findall(_mets_tag("structMap"))
-            if sm.get("TYPE") == "LOGICAL"
+            sm for sm in root.findall(_mets_tag("structMap")) if sm.get("TYPE") == "LOGICAL"
         )
         article_div = logical.find(f".//{_mets_tag('div')}[@TYPE='Article']")
         assert article_div is not None
@@ -490,8 +489,7 @@ class TestMETSStructMaps:
         METSCompiler().compile(full_sip)
         root = _parse_mets(full_sip / "mets.xml")
         logical = next(
-            sm for sm in root.findall(_mets_tag("structMap"))
-            if sm.get("TYPE") == "LOGICAL"
+            sm for sm in root.findall(_mets_tag("structMap")) if sm.get("TYPE") == "LOGICAL"
         )
         fptr = logical.find(f".//{_mets_tag('fptr')}")
         assert fptr is not None
@@ -502,8 +500,7 @@ class TestMETSStructMaps:
         METSCompiler().compile(full_sip)
         root = _parse_mets(full_sip / "mets.xml")
         phys = next(
-            sm for sm in root.findall(_mets_tag("structMap"))
-            if sm.get("TYPE") == "PHYSICAL"
+            sm for sm in root.findall(_mets_tag("structMap")) if sm.get("TYPE") == "PHYSICAL"
         )
         page_div = phys.find(f".//{_mets_tag('div')}[@ID='DIVP1']")
         assert page_div is not None
@@ -514,8 +511,7 @@ class TestMETSStructMaps:
         METSCompiler().compile(full_sip)
         root = _parse_mets(full_sip / "mets.xml")
         logical = next(
-            sm for sm in root.findall(_mets_tag("structMap"))
-            if sm.get("TYPE") == "LOGICAL"
+            sm for sm in root.findall(_mets_tag("structMap")) if sm.get("TYPE") == "LOGICAL"
         )
         newspaper_div = logical.find(f"{_mets_tag('div')}[@TYPE='Newspaper']")
         assert newspaper_div is not None
@@ -526,8 +522,7 @@ class TestMETSStructMaps:
         METSCompiler().compile(full_sip)
         root = _parse_mets(full_sip / "mets.xml")
         logical = next(
-            sm for sm in root.findall(_mets_tag("structMap"))
-            if sm.get("TYPE") == "LOGICAL"
+            sm for sm in root.findall(_mets_tag("structMap")) if sm.get("TYPE") == "LOGICAL"
         )
         article_div = logical.find(f".//{_mets_tag('div')}[@TYPE='Article']")
         assert article_div is not None
@@ -569,8 +564,7 @@ class TestMETSStructMaps:
         METSCompiler().compile(sip_dir)
         root = _parse_mets(sip_dir / "mets.xml")
         logical = next(
-            sm for sm in root.findall(_mets_tag("structMap"))
-            if sm.get("TYPE") == "LOGICAL"
+            sm for sm in root.findall(_mets_tag("structMap")) if sm.get("TYPE") == "LOGICAL"
         )
         article_div = logical.find(f".//{_mets_tag('div')}[@TYPE='Article']")
         assert article_div is not None
@@ -581,8 +575,7 @@ class TestMETSStructMaps:
         METSCompiler().compile(full_sip_two_articles)
         root = _parse_mets(full_sip_two_articles / "mets.xml")
         logical = next(
-            sm for sm in root.findall(_mets_tag("structMap"))
-            if sm.get("TYPE") == "LOGICAL"
+            sm for sm in root.findall(_mets_tag("structMap")) if sm.get("TYPE") == "LOGICAL"
         )
         article_divs = logical.findall(f".//{_mets_tag('div')}[@TYPE='Article']")
         labels = [d.get("LABEL") for d in article_divs]
@@ -593,13 +586,15 @@ class TestMETSStructMaps:
 # Tests: Multiple articles
 # ---------------------------------------------------------------------------
 
+
 class TestMETSCompilerMultipleArticles:
     def test_two_articles_two_related_items(self, full_sip_two_articles):
         """Two articles produce two relatedItem constituents in dmdSec."""
         METSCompiler().compile(full_sip_two_articles)
         root = _parse_mets(full_sip_two_articles / "mets.xml")
         related = [
-            r for r in root.findall(f".//{_mods_tag('relatedItem')}")
+            r
+            for r in root.findall(f".//{_mods_tag('relatedItem')}")
             if r.get("type") == "constituent"
         ]
         assert len(related) == 2
@@ -610,9 +605,7 @@ class TestMETSCompilerMultipleArticles:
         """Two articles produce two entries in PDFGRP."""
         METSCompiler().compile(full_sip_two_articles)
         root = _parse_mets(full_sip_two_articles / "mets.xml")
-        pdf_files = root.findall(
-            f".//{_mets_tag('fileGrp')}[@ID='PDFGRP']/{_mets_tag('file')}"
-        )
+        pdf_files = root.findall(f".//{_mets_tag('fileGrp')}[@ID='PDFGRP']/{_mets_tag('file')}")
         assert len(pdf_files) == 2
 
     def test_two_articles_global_page_ordering(self, full_sip_two_articles):
@@ -620,8 +613,7 @@ class TestMETSCompilerMultipleArticles:
         METSCompiler().compile(full_sip_two_articles)
         root = _parse_mets(full_sip_two_articles / "mets.xml")
         phys = next(
-            sm for sm in root.findall(_mets_tag("structMap"))
-            if sm.get("TYPE") == "PHYSICAL"
+            sm for sm in root.findall(_mets_tag("structMap")) if sm.get("TYPE") == "PHYSICAL"
         )
         assert phys.find(f".//{_mets_tag('div')}[@ID='DIVP1']") is not None
         assert phys.find(f".//{_mets_tag('div')}[@ID='DIVP2']") is not None
@@ -631,8 +623,7 @@ class TestMETSCompilerMultipleArticles:
         METSCompiler().compile(full_sip_two_articles)
         root = _parse_mets(full_sip_two_articles / "mets.xml")
         logical = next(
-            sm for sm in root.findall(_mets_tag("structMap"))
-            if sm.get("TYPE") == "LOGICAL"
+            sm for sm in root.findall(_mets_tag("structMap")) if sm.get("TYPE") == "LOGICAL"
         )
         article_divs = logical.findall(f".//{_mets_tag('div')}[@TYPE='Article']")
         orders = [div.get("ORDER") for div in article_divs]
@@ -643,14 +634,14 @@ class TestMETSCompilerMultipleArticles:
 # Tests: ALTO area tags in logical structMap
 # ---------------------------------------------------------------------------
 
+
 class TestMETSALTOAreaTags:
     def test_article_div_has_alto_fptr(self, full_sip):
         """Article div includes an fptr/seq with area tags for each TextBlock."""
         METSCompiler().compile(full_sip)
         root = _parse_mets(full_sip / "mets.xml")
         logical = next(
-            sm for sm in root.findall(_mets_tag("structMap"))
-            if sm.get("TYPE") == "LOGICAL"
+            sm for sm in root.findall(_mets_tag("structMap")) if sm.get("TYPE") == "LOGICAL"
         )
         article_div = logical.find(f".//{_mets_tag('div')}[@TYPE='Article']")
         seq = article_div.find(f".//{_mets_tag('seq')}")
@@ -665,14 +656,11 @@ class TestMETSALTOAreaTags:
         # Collect ALTO file IDs from fileSec
         alto_file_ids = {
             f.get("ID")
-            for f in root.findall(
-                f".//{_mets_tag('fileGrp')}[@ID='ALTOGRP']/{_mets_tag('file')}"
-            )
+            for f in root.findall(f".//{_mets_tag('fileGrp')}[@ID='ALTOGRP']/{_mets_tag('file')}")
         }
         # Collect FILEID values from logical structMap area tags
         logical = next(
-            sm for sm in root.findall(_mets_tag("structMap"))
-            if sm.get("TYPE") == "LOGICAL"
+            sm for sm in root.findall(_mets_tag("structMap")) if sm.get("TYPE") == "LOGICAL"
         )
         area_file_ids = {
             a.get("FILEID")
@@ -686,8 +674,7 @@ class TestMETSALTOAreaTags:
         METSCompiler().compile(full_sip)
         root = _parse_mets(full_sip / "mets.xml")
         logical = next(
-            sm for sm in root.findall(_mets_tag("structMap"))
-            if sm.get("TYPE") == "LOGICAL"
+            sm for sm in root.findall(_mets_tag("structMap")) if sm.get("TYPE") == "LOGICAL"
         )
         begin_values = [
             a.get("BEGIN")
@@ -733,8 +720,7 @@ class TestMETSALTOAreaTags:
         METSCompiler().compile(sip_dir)
         root = _parse_mets(sip_dir / "mets.xml")
         logical = next(
-            sm for sm in root.findall(_mets_tag("structMap"))
-            if sm.get("TYPE") == "LOGICAL"
+            sm for sm in root.findall(_mets_tag("structMap")) if sm.get("TYPE") == "LOGICAL"
         )
         article_div = logical.find(f".//{_mets_tag('div')}[@TYPE='Article']")
         seq = article_div.find(f".//{_mets_tag('seq')}")
@@ -745,8 +731,7 @@ class TestMETSALTOAreaTags:
         METSCompiler().compile(full_sip_two_articles)
         root = _parse_mets(full_sip_two_articles / "mets.xml")
         logical = next(
-            sm for sm in root.findall(_mets_tag("structMap"))
-            if sm.get("TYPE") == "LOGICAL"
+            sm for sm in root.findall(_mets_tag("structMap")) if sm.get("TYPE") == "LOGICAL"
         )
         article_divs = logical.findall(f".//{_mets_tag('div')}[@TYPE='Article']")
         assert len(article_divs) == 2
@@ -759,6 +744,7 @@ class TestMETSALTOAreaTags:
 # ---------------------------------------------------------------------------
 # Tests: Error handling
 # ---------------------------------------------------------------------------
+
 
 class TestMETSCompilerErrorHandling:
     def test_missing_mods_path_falls_back_to_ceo_id(self, tmp_path):
@@ -797,9 +783,7 @@ class TestMETSCompilerErrorHandling:
 
         METSCompiler().compile(sip_dir)
         root = _parse_mets(sip_dir / "mets.xml")
-        title_path = (
-            f".//{_mods_tag('relatedItem')}/{_mods_tag('titleInfo')}/{_mods_tag('title')}"
-        )
+        title_path = f".//{_mods_tag('relatedItem')}/{_mods_tag('titleInfo')}/{_mods_tag('title')}"
         title_els = root.findall(title_path)
         assert len(title_els) == 1
         assert "99999" in title_els[0].text
@@ -808,6 +792,7 @@ class TestMETSCompilerErrorHandling:
 # ---------------------------------------------------------------------------
 # Tests: VeridianSIPCompiler
 # ---------------------------------------------------------------------------
+
 
 class TestVeridianSIPCompiler:
     def test_instantiation(self):

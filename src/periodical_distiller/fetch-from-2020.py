@@ -51,7 +51,7 @@ def main() -> int:
                         logger.info(
                             f"[{succeeded + skipped + len(failed) + 1}/{total_days}]"
                             f" {current}: no content, skipping"
-                            )
+                        )
                         shutil.rmtree(pip_dir)
                         skipped += 1
                         current += timedelta(days=1)
@@ -67,9 +67,7 @@ def main() -> int:
 
                 current += timedelta(days=1)
 
-    logger.info(
-        f"\nDone. succeeded={succeeded}, skipped={skipped}, failed={len(failed)}"
-    )
+    logger.info(f"\nDone. succeeded={succeeded}, skipped={skipped}, failed={len(failed)}")
     if failed:
         logger.warning(f"Failed dates: {', '.join(failed)}")
         return 1

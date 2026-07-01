@@ -20,12 +20,17 @@ class TestCLIHarvestPIP:
 
     def test_harvest_pip_rejects_mixed_arguments(self, caplog):
         """harvest-pip fails with both --date and --start/--end."""
-        result = main([
-            "harvest-pip",
-            "--date", "2026-01-15",
-            "--start", "2026-01-15",
-            "--end", "2026-01-17",
-        ])
+        result = main(
+            [
+                "harvest-pip",
+                "--date",
+                "2026-01-15",
+                "--start",
+                "2026-01-15",
+                "--end",
+                "2026-01-17",
+            ]
+        )
 
         assert result == 1
         assert "Cannot specify both --date and --start/--end" in caplog.text
@@ -38,9 +43,7 @@ class TestCLIHarvestPIP:
         assert "Must specify either --date or both --start and --end" in caplog.text
 
     @patch("periodical_distiller.cli.CeoClient")
-    def test_harvest_pip_single_date(
-        self, mock_client_class, tmp_path, sample_ceo_record
-    ):
+    def test_harvest_pip_single_date(self, mock_client_class, tmp_path, sample_ceo_record):
         """harvest-pip creates PIP for single date."""
         from schemas.ceo_item import CeoItem
 
@@ -53,20 +56,22 @@ class TestCLIHarvestPIP:
         )
         mock_client_class.return_value = mock_client
 
-        result = main([
-            "harvest-pip",
-            "--date", "2026-01-15",
-            "--output", str(tmp_path),
-        ])
+        result = main(
+            [
+                "harvest-pip",
+                "--date",
+                "2026-01-15",
+                "--output",
+                str(tmp_path),
+            ]
+        )
 
         assert result == 0
         mock_client.fetch_by_date.assert_called_once_with(date(2026, 1, 15))
         assert (tmp_path / "2026-01-15" / "pip-manifest.json").exists()
 
     @patch("periodical_distiller.cli.CeoClient")
-    def test_harvest_pip_date_range(
-        self, mock_client_class, tmp_path, sample_ceo_record
-    ):
+    def test_harvest_pip_date_range(self, mock_client_class, tmp_path, sample_ceo_record):
         """harvest-pip creates PIP for date range."""
         from schemas.ceo_item import CeoItem
 
@@ -79,12 +84,17 @@ class TestCLIHarvestPIP:
         )
         mock_client_class.return_value = mock_client
 
-        result = main([
-            "harvest-pip",
-            "--start", "2026-01-15",
-            "--end", "2026-01-17",
-            "--output", str(tmp_path),
-        ])
+        result = main(
+            [
+                "harvest-pip",
+                "--start",
+                "2026-01-15",
+                "--end",
+                "2026-01-17",
+                "--output",
+                str(tmp_path),
+            ]
+        )
 
         assert result == 0
         mock_client.fetch_by_date_range.assert_called_once_with(
@@ -93,9 +103,7 @@ class TestCLIHarvestPIP:
         assert (tmp_path / "2026-01-15_to_2026-01-17" / "pip-manifest.json").exists()
 
     @patch("periodical_distiller.cli.CeoClient")
-    def test_harvest_pip_creates_output_dir(
-        self, mock_client_class, tmp_path, sample_ceo_record
-    ):
+    def test_harvest_pip_creates_output_dir(self, mock_client_class, tmp_path, sample_ceo_record):
         """harvest-pip creates output directory if it doesn't exist."""
         from schemas.ceo_item import CeoItem
 
@@ -110,19 +118,21 @@ class TestCLIHarvestPIP:
 
         output_dir = tmp_path / "nested" / "output"
 
-        result = main([
-            "harvest-pip",
-            "--date", "2026-01-15",
-            "--output", str(output_dir),
-        ])
+        result = main(
+            [
+                "harvest-pip",
+                "--date",
+                "2026-01-15",
+                "--output",
+                str(output_dir),
+            ]
+        )
 
         assert result == 0
         assert output_dir.exists()
 
     @patch("periodical_distiller.cli.CeoClient")
-    def test_harvest_pip_custom_base_url(
-        self, mock_client_class, tmp_path, sample_ceo_record
-    ):
+    def test_harvest_pip_custom_base_url(self, mock_client_class, tmp_path, sample_ceo_record):
         """harvest-pip accepts custom base URL."""
         from schemas.ceo_item import CeoItem
 
@@ -135,12 +145,17 @@ class TestCLIHarvestPIP:
         )
         mock_client_class.return_value = mock_client
 
-        result = main([
-            "harvest-pip",
-            "--date", "2026-01-15",
-            "--output", str(tmp_path),
-            "--base-url", "https://custom.example.com",
-        ])
+        result = main(
+            [
+                "harvest-pip",
+                "--date",
+                "2026-01-15",
+                "--output",
+                str(tmp_path),
+                "--base-url",
+                "https://custom.example.com",
+            ]
+        )
 
         assert result == 0
         call_args = mock_client_class.call_args[0][0]
@@ -148,23 +163,23 @@ class TestCLIHarvestPIP:
         assert "User-Agent" in call_args["headers"]
 
     @patch("periodical_distiller.cli.CeoClient")
-    def test_harvest_pip_handles_exception(
-        self, mock_client_class, tmp_path, caplog
-    ):
+    def test_harvest_pip_handles_exception(self, mock_client_class, tmp_path, caplog):
         """harvest-pip returns error code on exception."""
         mock_client = MagicMock()
         mock_client.__enter__ = MagicMock(return_value=mock_client)
         mock_client.__exit__ = MagicMock(return_value=False)
-        mock_client.fetch_by_date = MagicMock(
-            side_effect=Exception("Network error")
-        )
+        mock_client.fetch_by_date = MagicMock(side_effect=Exception("Network error"))
         mock_client_class.return_value = mock_client
 
-        result = main([
-            "harvest-pip",
-            "--date", "2026-01-15",
-            "--output", str(tmp_path),
-        ])
+        result = main(
+            [
+                "harvest-pip",
+                "--date",
+                "2026-01-15",
+                "--output",
+                str(tmp_path),
+            ]
+        )
 
         assert result == 1
         assert "Failed to create PIP" in caplog.text
@@ -249,13 +264,12 @@ class TestCLITransformALTO:
         assert "ALTO generation failed for 12345" in caplog.text
 
     @patch("periodical_distiller.cli.ALTOTransformer")
-    def test_transform_alto_handles_exception(
-        self, mock_transformer_class, tmp_path, caplog
-    ):
+    def test_transform_alto_handles_exception(self, mock_transformer_class, tmp_path, caplog):
         """transform-alto returns error code on unexpected exception."""
         sip_dir = tmp_path / "sip"
         sip_dir.mkdir()
         from schemas.sip import SIPManifest
+
         manifest = SIPManifest(id="x", pip_id="x")
         (sip_dir / "sip-manifest.json").write_text(manifest.model_dump_json(indent=2))
 
@@ -347,13 +361,12 @@ class TestCLITransformMODS:
         assert "MODS generation failed for 12345" in caplog.text
 
     @patch("periodical_distiller.cli.MODSTransformer")
-    def test_transform_mods_handles_exception(
-        self, mock_transformer_class, tmp_path, caplog
-    ):
+    def test_transform_mods_handles_exception(self, mock_transformer_class, tmp_path, caplog):
         """transform-mods returns error code on unexpected exception."""
         sip_dir = tmp_path / "sip"
         sip_dir.mkdir()
         from schemas.sip import SIPManifest
+
         manifest = SIPManifest(id="x", pip_id="x")
         (sip_dir / "sip-manifest.json").write_text(manifest.model_dump_json(indent=2))
 
@@ -452,13 +465,12 @@ class TestCLITransformImage:
         assert "Image generation failed for 12345" in caplog.text
 
     @patch("periodical_distiller.cli.ImageTransformer")
-    def test_transform_image_handles_exception(
-        self, mock_transformer_class, tmp_path, caplog
-    ):
+    def test_transform_image_handles_exception(self, mock_transformer_class, tmp_path, caplog):
         """transform-image returns error code on unexpected exception."""
         sip_dir = tmp_path / "sip"
         sip_dir.mkdir()
         from schemas.sip import SIPManifest
+
         manifest = SIPManifest(id="x", pip_id="x")
         (sip_dir / "sip-manifest.json").write_text(manifest.model_dump_json(indent=2))
 
@@ -521,9 +533,7 @@ class TestCLICompileSIP:
         mock_compiler.compile.assert_called_once_with(sip_dir.resolve())
 
     @patch("periodical_distiller.cli.VeridianSIPCompiler")
-    def test_compile_sip_reports_validation_errors(
-        self, mock_compiler_class, tmp_path, caplog
-    ):
+    def test_compile_sip_reports_validation_errors(self, mock_compiler_class, tmp_path, caplog):
         """compile-sip logs validation errors from the manifest."""
         from schemas.sip import SIPManifest
 
@@ -548,13 +558,12 @@ class TestCLICompileSIP:
         assert "METS build error: missing file" in caplog.text
 
     @patch("periodical_distiller.cli.VeridianSIPCompiler")
-    def test_compile_sip_handles_exception(
-        self, mock_compiler_class, tmp_path, caplog
-    ):
+    def test_compile_sip_handles_exception(self, mock_compiler_class, tmp_path, caplog):
         """compile-sip returns error code on unexpected exception."""
         sip_dir = tmp_path / "sip"
         sip_dir.mkdir()
         from schemas.sip import SIPManifest
+
         manifest = SIPManifest(id="x", pip_id="x")
         (sip_dir / "sip-manifest.json").write_text(manifest.model_dump_json(indent=2))
 

@@ -13,6 +13,7 @@ from schemas.sip import SIPArticle, SIPManifest, SIPPage
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_pdf(path: Path, pages: int = 1) -> None:
     """Write a minimal PDF with *pages* pages to *path*."""
     doc = fitz.open()
@@ -26,6 +27,7 @@ def _make_pdf(path: Path, pages: int = 1) -> None:
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def sip_with_pdf(tmp_path: Path) -> Path:
@@ -113,6 +115,7 @@ def sip_multiple_articles(tmp_path: Path) -> Path:
 # Tests: Initialization
 # ---------------------------------------------------------------------------
 
+
 class TestImageTransformerInit:
     def test_instantiation(self):
         """ImageTransformer can be instantiated with no arguments."""
@@ -123,6 +126,7 @@ class TestImageTransformerInit:
 # ---------------------------------------------------------------------------
 # Tests: transform() – file creation
 # ---------------------------------------------------------------------------
+
 
 class TestImageTransformerTransform:
     def test_transform_creates_jpeg_file(self, sip_with_pdf):
@@ -175,6 +179,7 @@ class TestImageTransformerTransform:
 # ---------------------------------------------------------------------------
 # Tests: Error handling
 # ---------------------------------------------------------------------------
+
 
 class TestImageTransformerErrorHandling:
     def test_skips_article_without_pdf_path(self, tmp_path):

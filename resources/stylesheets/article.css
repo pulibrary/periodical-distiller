@@ -40,6 +40,19 @@ h1 {
     color: #000;
 }
 
+figure {
+    width: 100%;
+    text-align: center;
+    margin: 1cm 0;
+    page-break-inside: avoid;
+}
+
+figure img {
+    max-width: 50%;
+    height: auto;
+    display: inline-block;
+}
+
 .subhead {
     font-size: 14pt;
     font-style: italic;
